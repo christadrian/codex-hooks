@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -6,7 +7,7 @@ const COMPLETION_STATUSES = ['DONE', 'DONE_WITH_CONCERNS', 'BLOCKED', 'NEEDS_CON
 const SKILL_RULES = [
   {
     skill: 'recover',
-    pattern: /\b(broken|bug|crash|error|failing|failed|failure|fix|keeps failing|regression)\b/i,
+    pattern: /\b(broken|bug|crash|debug|error|failing|failed|failure|fix|keeps failing|regression|troubleshoot)\b/i,
   },
   {
     skill: 'remember',
@@ -14,11 +15,11 @@ const SKILL_RULES = [
   },
   {
     skill: 'review',
-    pattern: /\b(review|audit|ready to ship|done|verify|production ready)\b/i,
+    pattern: /\b(review|audit|ready to ship|done|verify|production ready|ship|release)\b/i,
   },
   {
     skill: 'architect',
-    pattern: /\b(build|create|implement|add|design|scaffold|feature|project)\b/i,
+    pattern: /\b(build|create|implement|add|design|scaffold|feature|project|refactor)\b/i,
   },
   {
     skill: 'imprint',
@@ -118,7 +119,9 @@ export function buildHookResponse(payload = {}) {
       };
     }
 
-    if (payload.tool_response?.exit_code && payload.tool_response.exit_code !== 0) {
+    const exitCode = payload.tool_response?.exit_code ?? payload.tool_response?.exitCode;
+
+    if (exitCode && exitCode !== 0) {
       return {
         additionalContext: 'Tool failed. If this is repeated or unclear, use `/recover` before patching further.',
       };
@@ -199,6 +202,25 @@ export function mergeHooksToml(existingToml = '', repoPath) {
   const withoutManagedBlock = existingToml.replace(MANAGED_TOML_PATTERN, '\n').trimEnd();
 
   return `${withoutManagedBlock}${withoutManagedBlock ? '\n\n' : ''}${managedBlock}\n`;
+}
+
+export function writeFileAtomic(filePath, contents) {
+  const dir = path.dirname(filePath);
+  const base = path.basename(filePath);
+  const tmpPath = path.join(dir, `.${base}.${process.pid}.${randomUUID()}.tmp`);
+
+  try {
+    fs.writeFileSync(tmpPath, contents);
+    fs.renameSync(tmpPath, filePath);
+  } catch (error) {
+    try {
+      fs.rmSync(tmpPath, { force: true });
+    } catch {
+      // Best-effort cleanup after failed config writes.
+    }
+
+    throw error;
+  }
 }
 
 export function mergeHooksConfig(existing = {}, addition = {}) {

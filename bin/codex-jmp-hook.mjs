@@ -11,7 +11,24 @@ function readStdin() {
 }
 
 const input = readStdin().trim();
-const payload = input ? JSON.parse(input) : {};
+let payload = {};
+
+try {
+  payload = input ? JSON.parse(input) : {};
+} catch {
+  payload = null;
+}
+
+if (payload === null) {
+  process.stdout.write(
+    `${JSON.stringify({
+      decision: 'approve',
+      additionalContext: 'Hook input was not valid JSON. Continue, but inspect hook payload generation if this repeats.',
+    })}\n`,
+  );
+  process.exit(0);
+}
+
 const response = buildHookResponse(payload);
 
 process.stdout.write(`${JSON.stringify(response)}\n`);

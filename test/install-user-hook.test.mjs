@@ -5,6 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 
+const packageJson = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+
 describe('install-user-hook', () => {
   it('installs hooks into config.toml and removes migrated legacy hooks.json entries', () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-hooks-home-'));
@@ -66,5 +68,11 @@ describe('install-user-hook', () => {
 
     assert.equal(fs.existsSync(path.join(codexDir, 'hooks.json')), false);
     assert.match(fs.readFileSync(path.join(codexDir, 'config.toml'), 'utf8'), /codex-jmp-hook\.mjs/);
+  });
+});
+
+describe('package publish config', () => {
+  it('publishes runtime files and excludes local memory/test artifacts', () => {
+    assert.deepEqual(packageJson.files, ['bin/', 'src/', 'scripts/', '.codex/hooks.json', 'README.md']);
   });
 });

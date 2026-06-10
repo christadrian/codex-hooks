@@ -27,6 +27,21 @@ const cases = [
     input: { hook_event_name: 'Stop' },
     expect: /"decision":"approve"/,
   },
+  {
+    name: 'warns on failed camelCase tool response',
+    input: { hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_response: { exitCode: 1 } },
+    expect: /recover/,
+  },
+  {
+    name: 'routes debug prompt to recover',
+    input: { hook_event_name: 'UserPromptSubmit', prompt: 'Debug this failing hook' },
+    expect: /Use `recover`/,
+  },
+  {
+    name: 'routes release prompt to review',
+    input: { hook_event_name: 'UserPromptSubmit', prompt: 'Release the hook package' },
+    expect: /Use `review`/,
+  },
 ];
 
 let passed = 0;

@@ -101,6 +101,32 @@ describe('buildHookResponse', () => {
 
     assert.equal(response.decision, 'approve');
   });
+
+  it('warns on failed tool responses that use camelCase exitCode', () => {
+    const response = buildHookResponse({
+      hook_event_name: 'PostToolUse',
+      tool_name: 'Bash',
+      tool_response: { exitCode: 1 },
+    });
+
+    assert.match(response.additionalContext, /use `\/recover`/i);
+  });
+});
+
+describe('expanded skill routing', () => {
+  it('routes troubleshooting prompts to recover', () => {
+    assert.deepEqual(detectLikelySkills('Debug this failing checkout flow'), ['recover']);
+    assert.deepEqual(detectLikelySkills('Troubleshoot the broken hook'), ['recover']);
+  });
+
+  it('routes refactor prompts to architect', () => {
+    assert.deepEqual(detectLikelySkills('Refactor the hook installer'), ['architect']);
+  });
+
+  it('routes ship and release prompts to review', () => {
+    assert.deepEqual(detectLikelySkills('Ship this package'), ['review']);
+    assert.deepEqual(detectLikelySkills('Release the hook update'), ['review']);
+  });
 });
 
 describe('mergeHooksConfig', () => {
@@ -136,6 +162,26 @@ describe('mergeHooksToml', () => {
     assert.equal((twice.match(/BEGIN codex-javascript-mastery-hooks/g) ?? []).length, 1);
     assert.match(twice, /new-repo/);
     assert.doesNotMatch(twice, /old-repo/);
+  });
+});
+
+describe('writeFileAtomic', () => {
+  it('writes target contents through a same-directory temporary file', async () => {
+    const { mkdtempSync, readFileSync, rmSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { writeFileAtomic } = await import('../src/hook-utils.mjs');
+
+    const dir = mkdtempSync(join(tmpdir(), 'codex-hooks-atomic-'));
+    const target = join(dir, 'config.toml');
+
+    try {
+      writeFileAtomic(target, 'model = "gpt-5"\n');
+
+      assert.equal(readFileSync(target, 'utf8'), 'model = "gpt-5"\n');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
