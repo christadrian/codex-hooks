@@ -87,6 +87,12 @@ describe('buildHookResponse', () => {
     assert.match(response.reason, /completion status/i);
   });
 
+  it('allows Stop when Codex does not provide final response text', () => {
+    const response = buildHookResponse({ hook_event_name: 'Stop' });
+
+    assert.equal(response.decision, 'approve');
+  });
+
   it('allows Stop when final status exists', () => {
     const response = buildHookResponse({
       hook_event_name: 'Stop',

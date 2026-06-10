@@ -67,6 +67,18 @@ function lastAssistantText(transcript = []) {
   return '';
 }
 
+function stopText(payload = {}) {
+  if (Object.hasOwn(payload, 'final_response')) {
+    return String(payload.final_response ?? '');
+  }
+
+  if (Array.isArray(payload.transcript)) {
+    return lastAssistantText(payload.transcript);
+  }
+
+  return null;
+}
+
 function skillContext(skills) {
   if (skills.length === 0) return '';
 
@@ -116,7 +128,11 @@ export function buildHookResponse(payload = {}) {
   }
 
   if (eventName === 'Stop') {
-    const finalText = payload.final_response ?? lastAssistantText(payload.transcript ?? []);
+    const finalText = stopText(payload);
+    if (finalText === null) {
+      return { decision: 'approve' };
+    }
+
     if (!hasCompletionStatus(finalText)) {
       return {
         decision: 'block',

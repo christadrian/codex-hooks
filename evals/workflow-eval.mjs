@@ -22,6 +22,11 @@ const cases = [
     input: { hook_event_name: 'Stop', final_response: 'Tests pass.' },
     expect: /Missing completion status/,
   },
+  {
+    name: 'does not block missing Stop text payload',
+    input: { hook_event_name: 'Stop' },
+    expect: /"decision":"approve"/,
+  },
 ];
 
 let passed = 0;
