@@ -23,9 +23,14 @@ const cases = [
     expect: /Missing completion status/,
   },
   {
-    name: 'does not block missing Stop text payload',
+    name: 'blocks missing completion status from Codex Stop payload',
+    input: { hook_event_name: 'Stop', last_assistant_message: 'Tests pass.' },
+    expect: /"decision":"block"[\s\S]*Missing completion status/,
+  },
+  {
+    name: 'stays silent for allowed Stop payloads',
     input: { hook_event_name: 'Stop' },
-    expect: /"decision":"approve"/,
+    expectEqual: null,
   },
   {
     name: 'warns on failed camelCase tool response',
@@ -47,8 +52,12 @@ const cases = [
 let passed = 0;
 
 for (const testCase of cases) {
-  const output = JSON.stringify(buildHookResponse(testCase.input));
-  assert.match(output, testCase.expect, testCase.name);
+  const response = buildHookResponse(testCase.input);
+  if (Object.hasOwn(testCase, 'expectEqual')) {
+    assert.deepEqual(response, testCase.expectEqual, testCase.name);
+  } else {
+    assert.match(JSON.stringify(response), testCase.expect, testCase.name);
+  }
   passed += 1;
 }
 

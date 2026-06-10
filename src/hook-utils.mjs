@@ -73,6 +73,10 @@ function stopText(payload = {}) {
     return String(payload.final_response ?? '');
   }
 
+  if (Object.hasOwn(payload, 'last_assistant_message')) {
+    return String(payload.last_assistant_message ?? '');
+  }
+
   if (Array.isArray(payload.transcript)) {
     return lastAssistantText(payload.transcript);
   }
@@ -141,7 +145,7 @@ export function buildHookResponse(payload = {}) {
   if (eventName === 'Stop') {
     const finalText = stopText(payload);
     if (finalText === null) {
-      return { decision: 'approve' };
+      return null;
     }
 
     if (!hasCompletionStatus(finalText)) {
@@ -151,7 +155,7 @@ export function buildHookResponse(payload = {}) {
       };
     }
 
-    return { decision: 'approve' };
+    return null;
   }
 
   return null;

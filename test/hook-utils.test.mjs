@@ -99,19 +99,38 @@ describe('buildHookResponse', () => {
     assert.match(response.reason, /completion status/i);
   });
 
-  it('allows Stop when Codex does not provide final response text', () => {
-    const response = buildHookResponse({ hook_event_name: 'Stop' });
+  it('blocks Stop when Codex last_assistant_message is missing final status', () => {
+    const response = buildHookResponse({
+      hook_event_name: 'Stop',
+      last_assistant_message: 'Tests pass.',
+    });
 
-    assert.equal(response.decision, 'approve');
+    assert.equal(response.decision, 'block');
+    assert.match(response.reason, /completion status/i);
   });
 
-  it('allows Stop when final status exists', () => {
+  it('returns null for allowed Stop when Codex does not provide final response text', () => {
+    const response = buildHookResponse({ hook_event_name: 'Stop' });
+
+    assert.equal(response, null);
+  });
+
+  it('returns null for allowed Stop when final status exists', () => {
     const response = buildHookResponse({
       hook_event_name: 'Stop',
       transcript: [{ role: 'assistant', content: 'DONE\nTests: npm test' }],
     });
 
-    assert.equal(response.decision, 'approve');
+    assert.equal(response, null);
+  });
+
+  it('returns null for allowed Stop when Codex last_assistant_message has final status', () => {
+    const response = buildHookResponse({
+      hook_event_name: 'Stop',
+      last_assistant_message: 'DONE\nTests: npm test',
+    });
+
+    assert.equal(response, null);
   });
 
   it('warns on failed tool responses that use camelCase exitCode', () => {
