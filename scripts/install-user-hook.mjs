@@ -2,19 +2,38 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createUserHookConfig, mergeHooksConfig } from '../src/hook-utils.mjs';
+import {
+  createUserHookCommand,
+  hasAnyHooks,
+  mergeHooksToml,
+  removeCommandFromHooksConfig,
+} from '../src/hook-utils.mjs';
 
 const repoPath = path.resolve(new URL('..', import.meta.url).pathname);
 const codexDir = path.join(os.homedir(), '.codex');
 const hooksPath = path.join(codexDir, 'hooks.json');
+const configPath = path.join(codexDir, 'config.toml');
 
 fs.mkdirSync(codexDir, { recursive: true });
 
-const existing = fs.existsSync(hooksPath)
-  ? JSON.parse(fs.readFileSync(hooksPath, 'utf8'))
-  : {};
+const existingToml = fs.existsSync(configPath) ? fs.readFileSync(configPath, 'utf8') : '';
+const nextToml = mergeHooksToml(existingToml, repoPath);
+fs.writeFileSync(configPath, nextToml);
 
-const next = mergeHooksConfig(existing, createUserHookConfig(repoPath));
-fs.writeFileSync(hooksPath, `${JSON.stringify(next, null, 2)}\n`);
+let legacyMessage = 'No legacy ~/.codex/hooks.json migration needed';
 
-console.log(`Installed JavaScript-Mastery-Pro Codex hooks to ${hooksPath}`);
+if (fs.existsSync(hooksPath)) {
+  const existingHooks = JSON.parse(fs.readFileSync(hooksPath, 'utf8'));
+  const migratedHooks = removeCommandFromHooksConfig(existingHooks, createUserHookCommand(repoPath));
+
+  if (hasAnyHooks(migratedHooks)) {
+    fs.writeFileSync(hooksPath, `${JSON.stringify(migratedHooks, null, 2)}\n`);
+    legacyMessage = 'Removed migrated JavaScript-Mastery-Pro hooks from legacy ~/.codex/hooks.json';
+  } else {
+    fs.unlinkSync(hooksPath);
+    legacyMessage = 'Removed legacy ~/.codex/hooks.json after migrating JavaScript-Mastery-Pro hooks';
+  }
+}
+
+console.log(`Installed JavaScript-Mastery-Pro Codex hooks to ${configPath}`);
+console.log(legacyMessage);

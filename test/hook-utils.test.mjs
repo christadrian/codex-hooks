@@ -3,11 +3,16 @@ import { describe, it } from 'node:test';
 
 import {
   buildHookResponse,
+  createUserHookCommand,
   createUserHookConfig,
+  createUserHookToml,
   detectLikelySkills,
   detectUiTouched,
+  hasAnyHooks,
   hasCompletionStatus,
   mergeHooksConfig,
+  mergeHooksToml,
+  removeCommandFromHooksConfig,
 } from '../src/hook-utils.mjs';
 
 describe('detectLikelySkills', () => {
@@ -105,5 +110,64 @@ describe('mergeHooksConfig', () => {
     assert.equal(next.hooks.Stop.length, 2);
     assert.equal(next.hooks.SessionStart.length, 1);
     assert.match(next.hooks.Stop[1].hooks[0].command, /codex-jmp-hook/);
+  });
+});
+
+describe('mergeHooksToml', () => {
+  it('adds a managed config.toml hook block', () => {
+    const next = mergeHooksToml('model = "gpt-5"\n', '/repo');
+
+    assert.match(next, /# BEGIN codex-javascript-mastery-hooks/);
+    assert.match(next, /\[\[hooks\.SessionStart\]\]/);
+    assert.match(next, /command = "node \\\"\/repo\/bin\/codex-jmp-hook\.mjs\\\""/);
+    assert.match(next, /# END codex-javascript-mastery-hooks/);
+  });
+
+  it('replaces an existing managed block instead of duplicating hooks', () => {
+    const once = mergeHooksToml('', '/old-repo');
+    const twice = mergeHooksToml(once, '/new-repo');
+
+    assert.equal((twice.match(/BEGIN codex-javascript-mastery-hooks/g) ?? []).length, 1);
+    assert.match(twice, /new-repo/);
+    assert.doesNotMatch(twice, /old-repo/);
+  });
+});
+
+describe('createUserHookToml', () => {
+  it('renders the four Codex hook events supported by this package', () => {
+    const toml = createUserHookToml('/repo');
+
+    assert.match(toml, /\[\[hooks\.SessionStart\]\]/);
+    assert.match(toml, /\[\[hooks\.UserPromptSubmit\]\]/);
+    assert.match(toml, /\[\[hooks\.PostToolUse\]\]/);
+    assert.match(toml, /\[\[hooks\.Stop\]\]/);
+  });
+});
+
+describe('removeCommandFromHooksConfig', () => {
+  it('removes only migrated package hooks from legacy hooks.json', () => {
+    const command = createUserHookCommand('/repo');
+    const existing = {
+      hooks: {
+        Stop: [
+          { hooks: [{ type: 'command', command }] },
+          { hooks: [{ type: 'command', command: 'echo keep' }] },
+        ],
+        SessionStart: [{ hooks: [{ type: 'command', command }] }],
+      },
+    };
+
+    const next = removeCommandFromHooksConfig(existing, command);
+
+    assert.deepEqual(next.hooks.Stop, [{ hooks: [{ type: 'command', command: 'echo keep' }] }]);
+    assert.equal(next.hooks.SessionStart, undefined);
+    assert.equal(hasAnyHooks(next), true);
+  });
+
+  it('reports empty when all legacy hooks belonged to this package', () => {
+    const command = createUserHookCommand('/repo');
+    const next = removeCommandFromHooksConfig({ hooks: { Stop: [{ hooks: [{ command }] }] } }, command);
+
+    assert.equal(hasAnyHooks(next), false);
   });
 });

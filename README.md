@@ -29,13 +29,13 @@ node bin/codex-jmp-hook.mjs
 
 ## User-Level Install
 
-Install into `~/.codex/hooks.json` after cloning this repo:
+Install into `~/.codex/config.toml` after cloning this repo:
 
 ```bash
 npm run install:user
 ```
 
-The installer merges these hooks into existing user hooks and does not delete existing entries.
+The installer writes a managed hook block into `config.toml`. If an older install put these same hooks in `~/.codex/hooks.json`, the installer migrates only this package's hooks out of that legacy file and preserves unrelated hooks.
 
 ## Test And Eval
 

@@ -143,6 +143,48 @@ export function createUserHookConfig(repoPath) {
   };
 }
 
+export function createUserHookToml(repoPath) {
+  const command = `node ${JSON.stringify(path.join(repoPath, 'bin/codex-jmp-hook.mjs'))}`;
+
+  return [
+    '[[hooks.SessionStart]]',
+    '[[hooks.SessionStart.hooks]]',
+    'type = "command"',
+    `command = ${JSON.stringify(command)}`,
+    '',
+    '[[hooks.UserPromptSubmit]]',
+    '[[hooks.UserPromptSubmit.hooks]]',
+    'type = "command"',
+    `command = ${JSON.stringify(command)}`,
+    '',
+    '[[hooks.PostToolUse]]',
+    'matcher = "apply_patch|Edit|Write|Bash"',
+    '[[hooks.PostToolUse.hooks]]',
+    'type = "command"',
+    `command = ${JSON.stringify(command)}`,
+    '',
+    '[[hooks.Stop]]',
+    '[[hooks.Stop.hooks]]',
+    'type = "command"',
+    `command = ${JSON.stringify(command)}`,
+    '',
+  ].join('\n');
+}
+
+const MANAGED_TOML_START = '# BEGIN codex-javascript-mastery-hooks';
+const MANAGED_TOML_END = '# END codex-javascript-mastery-hooks';
+const MANAGED_TOML_PATTERN = new RegExp(
+  `\\n?${MANAGED_TOML_START}\\n[\\s\\S]*?\\n${MANAGED_TOML_END}\\n?`,
+  'g',
+);
+
+export function mergeHooksToml(existingToml = '', repoPath) {
+  const managedBlock = [MANAGED_TOML_START, createUserHookToml(repoPath).trimEnd(), MANAGED_TOML_END].join('\n');
+  const withoutManagedBlock = existingToml.replace(MANAGED_TOML_PATTERN, '\n').trimEnd();
+
+  return `${withoutManagedBlock}${withoutManagedBlock ? '\n\n' : ''}${managedBlock}\n`;
+}
+
 export function mergeHooksConfig(existing = {}, addition = {}) {
   const next = { ...existing, hooks: { ...(existing.hooks ?? {}) } };
 
@@ -151,4 +193,47 @@ export function mergeHooksConfig(existing = {}, addition = {}) {
   }
 
   return next;
+}
+
+function hookEntryContainsCommand(entry = {}, command) {
+  return (entry.hooks ?? []).some((hook) => hook.command === command);
+}
+
+export function removeCommandFromHooksConfig(existing = {}, command) {
+  const next = { ...existing, hooks: {} };
+
+  for (const [eventName, entries] of Object.entries(existing.hooks ?? {})) {
+    const keptEntries = entries
+      .map((entry) => {
+        const hadCommand = hookEntryContainsCommand(entry, command);
+
+        return {
+          entry: {
+            ...entry,
+            hooks: (entry.hooks ?? []).filter((hook) => hook.command !== command),
+          },
+          hadCommand,
+        };
+      })
+      .filter(({ entry, hadCommand }) => entry.hooks.length > 0 || !hadCommand)
+      .map(({ entry }) => entry);
+
+    if (keptEntries.length > 0) {
+      next.hooks[eventName] = keptEntries;
+    }
+  }
+
+  for (const [key, value] of Object.entries(existing)) {
+    if (key !== 'hooks') next[key] = value;
+  }
+
+  return next;
+}
+
+export function hasAnyHooks(config = {}) {
+  return Object.values(config.hooks ?? {}).some((entries) => entries.length > 0);
+}
+
+export function createUserHookCommand(repoPath) {
+  return `node ${JSON.stringify(path.join(repoPath, 'bin/codex-jmp-hook.mjs'))}`;
 }
