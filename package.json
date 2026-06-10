@@ -1,0 +1,26 @@
+{
+  "name": "codex-javascript-mastery-hooks",
+  "version": "0.1.0",
+  "description": "Codex lifecycle hooks for JavaScript-Mastery-Pro skill workflows.",
+  "type": "module",
+  "private": false,
+  "bin": {
+    "codex-jmp-hook": "bin/codex-jmp-hook.mjs"
+  },
+  "scripts": {
+    "test": "node --test",
+    "eval": "node evals/workflow-eval.mjs",
+    "install:user": "node scripts/install-user-hook.mjs",
+    "check": "npm test && npm run eval"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "codex",
+    "hooks",
+    "skills",
+    "javascript-mastery-pro"
+  ],
+  "license": "MIT"
+}
