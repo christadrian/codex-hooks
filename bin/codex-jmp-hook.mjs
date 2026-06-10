@@ -23,7 +23,7 @@ if (payload === null) {
   process.stdout.write(
     `${JSON.stringify({
       decision: 'approve',
-      additionalContext: 'Hook input was not valid JSON. Continue, but inspect hook payload generation if this repeats.',
+      systemMessage: 'Hook input was not valid JSON. Continue, but inspect hook payload generation if this repeats.',
     })}\n`,
   );
   process.exit(0);
@@ -31,4 +31,6 @@ if (payload === null) {
 
 const response = buildHookResponse(payload);
 
-process.stdout.write(`${JSON.stringify(response)}\n`);
+if (response !== null) {
+  process.stdout.write(`${JSON.stringify(response)}\n`);
+}

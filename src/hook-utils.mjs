@@ -87,6 +87,15 @@ function skillContext(skills) {
   return ['JavaScript-Mastery-Pro skill routing:', ...lines].join('\n');
 }
 
+function additionalContextOutput(hookEventName, additionalContext) {
+  return {
+    hookSpecificOutput: {
+      hookEventName,
+      additionalContext,
+    },
+  };
+}
+
 function sessionStartContext(cwd = process.cwd()) {
   const memoryPath = path.join(cwd, 'memory.md');
   const memoryLine = fs.existsSync(memoryPath)
@@ -104,30 +113,29 @@ export function buildHookResponse(payload = {}) {
   const eventName = payload.hook_event_name ?? payload.event ?? '';
 
   if (eventName === 'SessionStart') {
-    return { additionalContext: sessionStartContext(payload.cwd) };
+    return additionalContextOutput('SessionStart', sessionStartContext(payload.cwd));
   }
 
   if (eventName === 'UserPromptSubmit') {
     const context = skillContext(detectLikelySkills(payload.prompt ?? ''));
-    return context ? { additionalContext: context } : {};
+    return context ? additionalContextOutput('UserPromptSubmit', context) : null;
   }
 
   if (eventName === 'PostToolUse') {
     if (detectUiTouched(payload)) {
-      return {
-        additionalContext: 'UI files changed. Run `/imprint` before marking work complete.',
-      };
+      return additionalContextOutput('PostToolUse', 'UI files changed. Run `/imprint` before marking work complete.');
     }
 
     const exitCode = payload.tool_response?.exit_code ?? payload.tool_response?.exitCode;
 
     if (exitCode && exitCode !== 0) {
-      return {
-        additionalContext: 'Tool failed. If this is repeated or unclear, use `/recover` before patching further.',
-      };
+      return additionalContextOutput(
+        'PostToolUse',
+        'Tool failed. If this is repeated or unclear, use `/recover` before patching further.',
+      );
     }
 
-    return {};
+    return null;
   }
 
   if (eventName === 'Stop') {
@@ -146,7 +154,7 @@ export function buildHookResponse(payload = {}) {
     return { decision: 'approve' };
   }
 
-  return {};
+  return null;
 }
 
 export function createUserHookConfig(repoPath) {

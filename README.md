@@ -19,14 +19,6 @@ The hooks do not replace skills. They add deterministic reminders and gates so a
 | `PostToolUse` | Detects UI file edits and asks for `/imprint`; warns after failed tool runs. |
 | `Stop` | Blocks final responses that omit `DONE`, `DONE_WITH_CONCERNS`, `BLOCKED`, or `NEEDS_CONTEXT`. |
 
-## Local Project Hook
-
-This repo includes `.codex/hooks.json`. When Codex trusts this project hook, commands run from this repository:
-
-```bash
-node bin/codex-jmp-hook.mjs
-```
-
 ## User-Level Install
 
 Install into `~/.codex/config.toml` after cloning this repo:
@@ -35,7 +27,7 @@ Install into `~/.codex/config.toml` after cloning this repo:
 npm run install:user
 ```
 
-The installer writes a managed hook block into `config.toml`. If an older install put these same hooks in `~/.codex/hooks.json`, the installer migrates only this package's hooks out of that legacy file and preserves unrelated hooks.
+The installer writes a managed hook block into `config.toml`. This package uses user-level hooks only so a project checkout does not run the same hook twice. If an older install put these same hooks in `~/.codex/hooks.json`, the installer migrates only this package's hooks out of that legacy file and preserves unrelated hooks.
 
 ## Test And Eval
 

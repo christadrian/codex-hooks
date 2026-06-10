@@ -67,14 +67,26 @@ describe('hasCompletionStatus', () => {
 });
 
 describe('buildHookResponse', () => {
-  it('adds skill context on UserPromptSubmit', () => {
+  it('wraps UserPromptSubmit context in hookSpecificOutput', () => {
     const response = buildHookResponse({
       hook_event_name: 'UserPromptSubmit',
       prompt: 'Build a profile card component',
     });
 
-    assert.match(response.additionalContext, /Use `architect`/);
-    assert.match(response.additionalContext, /Use `imprint`/);
+    assert.equal(response.hookSpecificOutput.hookEventName, 'UserPromptSubmit');
+    assert.match(response.hookSpecificOutput.additionalContext, /Use `architect`/);
+    assert.match(response.hookSpecificOutput.additionalContext, /Use `imprint`/);
+  });
+
+  it('wraps SessionStart context in hookSpecificOutput', () => {
+    const response = buildHookResponse({ hook_event_name: 'SessionStart', cwd: process.cwd() });
+
+    assert.equal(response.hookSpecificOutput.hookEventName, 'SessionStart');
+    assert.match(response.hookSpecificOutput.additionalContext, /workflow installed/);
+  });
+
+  it('returns null for no-op UserPromptSubmit output so CLI can stay silent', () => {
+    assert.equal(buildHookResponse({ hook_event_name: 'UserPromptSubmit', prompt: 'hello' }), null);
   });
 
   it('blocks Stop when final status is missing', () => {
@@ -109,7 +121,8 @@ describe('buildHookResponse', () => {
       tool_response: { exitCode: 1 },
     });
 
-    assert.match(response.additionalContext, /use `\/recover`/i);
+    assert.equal(response.hookSpecificOutput.hookEventName, 'PostToolUse');
+    assert.match(response.hookSpecificOutput.additionalContext, /use `\/recover`/i);
   });
 });
 

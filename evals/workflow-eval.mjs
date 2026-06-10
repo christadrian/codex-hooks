@@ -6,7 +6,7 @@ const cases = [
   {
     name: 'routes new UI work to architect and imprint',
     input: { hook_event_name: 'UserPromptSubmit', prompt: 'Create a settings card component' },
-    expect: /Use `architect`[\s\S]*Use `imprint`/,
+    expect: /"hookEventName":"UserPromptSubmit"[\s\S]*Use `architect`[\s\S]*Use `imprint`/,
   },
   {
     name: 'warns after UI patch',
@@ -15,7 +15,7 @@ const cases = [
       tool_name: 'apply_patch',
       tool_input: { patch: '*** Add File: components/SettingsCard.tsx' },
     },
-    expect: /Run `\/imprint`/,
+    expect: /"hookEventName":"PostToolUse"[\s\S]*Run `\/imprint`/,
   },
   {
     name: 'blocks missing completion status',
@@ -35,12 +35,12 @@ const cases = [
   {
     name: 'routes debug prompt to recover',
     input: { hook_event_name: 'UserPromptSubmit', prompt: 'Debug this failing hook' },
-    expect: /Use `recover`/,
+    expect: /"hookEventName":"UserPromptSubmit"[\s\S]*Use `recover`/,
   },
   {
     name: 'routes release prompt to review',
     input: { hook_event_name: 'UserPromptSubmit', prompt: 'Release the hook package' },
-    expect: /Use `review`/,
+    expect: /"hookEventName":"UserPromptSubmit"[\s\S]*Use `review`/,
   },
 ];
 
