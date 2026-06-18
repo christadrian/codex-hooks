@@ -1,40 +1,34 @@
-# Memory - Stop Hook Output Contract Fix
+# Memory - Hook duplicate cleanup + Stop status explanation
 
-Last updated: 2026-06-11 02:34:00 EAT
+Last updated: 2026-06-18 11:15:00 EAT
 
 ## What was built
 
-- Updated `src/hook-utils.mjs` so allowed `Stop` responses return `null`, making the CLI emit no stdout instead of invalid `{"decision":"approve"}`.
-- Updated `src/hook-utils.mjs` so `Stop` reads Codex's real `last_assistant_message` field before falling back to transcript-based compatibility input.
-- Updated `bin/codex-jmp-hook.mjs` so malformed stdin exits cleanly with no stdout. This avoids emitting invalid Stop JSON when the event cannot be identified.
-- Added regression coverage in `test/cli.test.mjs`, `test/hook-utils.test.mjs`, and `evals/workflow-eval.mjs` for silent allowed Stop output, malformed stdin silence, and valid `decision:block` output from `last_assistant_message`.
+- Removed the duplicate `codex-javascript-mastery-hooks` block from `/home/christadrian/.codex/config.toml`.
+- Removed the stale `[hooks.state]` entries that belonged to the duplicate block.
+- Left a backup at `/home/christadrian/.codex/config.toml.bak`.
 
 ## Decisions made
 
-- Stop hook allow/no-op path must be silent. Codex's Stop output schema accepts `decision:"block"`, `continue:false`, and universal fields like `systemMessage`; it does not accept `decision:"approve"`.
-- Malformed input should fail open silently because the hook cannot know which event schema applies.
-- Completion-status enforcement remains on Stop, but now uses `last_assistant_message`, matching Codex Rust hook input schema.
+- The Stop hook enforces that the assistant's final message contains one of `DONE`, `DONE_WITH_CONCERNS`, `BLOCKED`, or `NEEDS_CONTEXT` at the start of a line. If it does not, the hook returns `decision:block` with the "Missing completion status" reason.
+- Duplicate `codex-hooks` entries were indeed installed twice, causing every event to run multiple times and multiple Stop rows in the UI.
 
 ## Problems solved
 
-- Codex Desktop showed `hook returned invalid stop hook JSON output` because the hook emitted `{"decision":"approve"}` for allowed Stop runs.
-- The Stop completion-status gate could miss real Codex Desktop Stop payloads because the code did not read `last_assistant_message`.
+- The red "Missing completion status" rows in Codex Desktop are the hook working as designed: earlier assistant replies ended without a status line, so the Stop hook blocked.
+- The duplicate hook installs are gone, so Codex should only run one `codex-hooks` hook per event.
 
 ## Current state
 
-- Verification passed:
-  - `npm run check`: 33 tests passed, eval 8/8, score `1`.
-  - `npm pack --dry-run`: 5 runtime files only: `README.md`, `bin/codex-jmp-hook.mjs`, `package.json`, `scripts/install-user-hook.mjs`, `src/hook-utils.mjs`.
-- Direct CLI checks passed:
-  - Allowed Stop with `last_assistant_message: "DONE\nTests: npm test"` emits 0 bytes.
-  - Missing-status Stop with `last_assistant_message: "Tests pass."` emits valid `{"decision":"block","reason":"Missing completion status..."}`.
-  - Malformed stdin emits 0 bytes.
+- `/home/christadrian/.codex/config.toml` now has one `codex-hooks` block per event plus the existing `codex-wakatime` hooks.
+- A backup of the pre-dedup config exists at `/home/christadrian/.codex/config.toml.bak`.
 
 ## Next session starts with
 
-- Run `/remember restore`.
-- Restart Codex Desktop or start a fresh thread so hook rows are re-read, then confirm the Stop row no longer shows `hook returned invalid stop hook JSON output`.
+- Restart Codex Desktop or start a fresh thread so the updated config is reloaded.
+- Approve the remaining hooks if Codex prompts for trust again.
+- Continue whatever task is next; remember to end every task response with a line starting with `DONE`, `DONE_WITH_CONCERNS`, `BLOCKED`, or `NEEDS_CONTEXT`.
 
 ## Open questions
 
-- Whether stale `[hooks.state]` entries in `/home/christadrian/.codex/config.toml` for deleted hook files should be pruned by a future installer cleanup pass.
+- None.
