@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
-import { buildHookResponse } from '../src/hook-utils.mjs';
+import { buildHookResponse, clearTurnEdited, markTurnEdited } from '../src/hook-utils.mjs';
 
 const cases = [
   {
@@ -28,6 +28,18 @@ const cases = [
     expect: /"decision":"block"[\s\S]*Missing completion status/,
   },
   {
+    name: 'skips block advisory Stop with turn_id and no file edits',
+    input: { hook_event_name: 'Stop', turn_id: 'eval-advisory', last_assistant_message: 'Run pipx install to fix it.' },
+    expectEqual: null,
+  },
+  {
+    name: 'blocks Stop after file edits when status missing',
+    setup: () => markTurnEdited('eval-task'),
+    teardown: () => clearTurnEdited('eval-task'),
+    input: { hook_event_name: 'Stop', turn_id: 'eval-task', last_assistant_message: 'Fixed the bug.' },
+    expect: /"decision":"block"[\s\S]*Missing completion status/,
+  },
+  {
     name: 'stays silent for allowed Stop payloads',
     input: { hook_event_name: 'Stop' },
     expectEqual: null,
@@ -52,7 +64,13 @@ const cases = [
 let passed = 0;
 
 for (const testCase of cases) {
-  const response = buildHookResponse(testCase.input);
+  if (typeof testCase.setup === 'function') testCase.setup();
+  let response;
+  try {
+    response = buildHookResponse(testCase.input);
+  } finally {
+    if (typeof testCase.teardown === 'function') testCase.teardown();
+  }
   if (Object.hasOwn(testCase, 'expectEqual')) {
     assert.deepEqual(response, testCase.expectEqual, testCase.name);
   } else {

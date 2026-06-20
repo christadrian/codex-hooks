@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  clearTurnEdited,
+  isFileEditTool,
+  markTurnEdited,
+  turnEdited,
   buildHookResponse,
   createUserHookCommand,
   createUserHookConfig,
@@ -253,5 +257,127 @@ describe('removeCommandFromHooksConfig', () => {
     const next = removeCommandFromHooksConfig({ hooks: { Stop: [{ hooks: [{ command }] }] } }, command);
 
     assert.equal(hasAnyHooks(next), false);
+  });
+});
+
+describe('Stop completion-status gating by file edits', () => {
+  const tmpTurn = 'test-turn-gating';
+
+  afterEach(() => clearTurnEdited(tmpTurn));
+
+  it('isFileEditTool matches apply_patch/Edit/Write only', () => {
+    assert.equal(isFileEditTool('apply_patch'), true);
+    assert.equal(isFileEditTool('Edit'), true);
+    assert.equal(isFileEditTool('WRITE'), true);
+    assert.equal(isFileEditTool('Bash'), false);
+    assert.equal(isFileEditTool('exec_command'), false);
+  });
+
+  it('markTurnEdited/turnEdited/clearTurnEdited round-trip', () => {
+    assert.equal(turnEdited(tmpTurn), false);
+    markTurnEdited(tmpTurn);
+    assert.equal(turnEdited(tmpTurn), true);
+    clearTurnEdited(tmpTurn);
+    assert.equal(turnEdited(tmpTurn), false);
+  });
+
+  it('turnEdited returns null when turnId is absent', () => {
+    assert.equal(turnEdited(undefined), null);
+    assert.equal(turnEdited(''), null);
+  });
+
+  it('skips block for advisory Stop (turn_id present, no file edits)', () => {
+    const response = buildHookResponse({
+      hook_event_name: 'Stop',
+      turn_id: 'advisory-turn',
+      last_assistant_message: 'Run pipx install to fix it.',
+    });
+    assert.equal(response, null);
+  });
+
+  it('blocks Stop after file edits when status is missing', () => {
+    const turn = 'task-turn-missing-status';
+    markTurnEdited(turn);
+    try {
+      const response = buildHookResponse({
+        hook_event_name: 'Stop',
+        turn_id: turn,
+        last_assistant_message: 'Fixed the bug in auth.py.',
+      });
+      assert.equal(response.decision, 'block');
+      assert.match(response.reason, /Missing completion status/);
+    } finally {
+      clearTurnEdited(turn);
+    }
+  });
+
+  it('allows Stop after file edits when status is present and clears flag', () => {
+    const turn = 'task-turn-with-status';
+    markTurnEdited(turn);
+    try {
+      const response = buildHookResponse({
+        hook_event_name: 'Stop',
+        turn_id: turn,
+        last_assistant_message: 'DONE\nTests: npm test',
+      });
+      assert.equal(response, null);
+      assert.equal(turnEdited(turn), false, 'flag should be cleared after success');
+    } finally {
+      clearTurnEdited(turn);
+    }
+  });
+
+  it('keeps flag across a block-retry so enforcement persists', () => {
+    const turn = 'task-turn-retry';
+    markTurnEdited(turn);
+    try {
+      const first = buildHookResponse({
+        hook_event_name: 'Stop',
+        turn_id: turn,
+        last_assistant_message: 'Fixed it.',
+      });
+      assert.equal(first.decision, 'block');
+      assert.equal(turnEdited(turn), true, 'flag must persist after a block');
+      const second = buildHookResponse({
+        hook_event_name: 'Stop',
+        turn_id: turn,
+        last_assistant_message: 'DONE\nTests: npm test',
+      });
+      assert.equal(second, null);
+      assert.equal(turnEdited(turn), false);
+    } finally {
+      clearTurnEdited(turn);
+    }
+  });
+
+  it('falls back to block when turnId is unknown and status is missing', () => {
+    const response = buildHookResponse({
+      hook_event_name: 'Stop',
+      last_assistant_message: 'Tests pass.',
+    });
+    assert.equal(response.decision, 'block');
+  });
+});
+
+describe('PostToolUse records file edits by turn_id', () => {
+  const turn = 'ptu-turn';
+  afterEach(() => clearTurnEdited(turn));
+
+  it('marks the turn edited for apply_patch', () => {
+    assert.equal(turnEdited(turn), false);
+    const response = buildHookResponse({
+      hook_event_name: 'PostToolUse',
+      tool_name: 'apply_patch',
+      turn_id: turn,
+      tool_input: { patch: '*** Add File: scripts/run.mjs\n+console.log(1)' },
+    });
+    assert.equal(turnEdited(turn), true);
+    assert.equal(response, null, 'non-UI edit should still return null');
+  });
+
+  it('does not mark the turn for Bash/exec_command', () => {
+    clearTurnEdited(turn);
+    buildHookResponse({ hook_event_name: 'PostToolUse', tool_name: 'Bash', turn_id: turn, tool_response: { exit_code: 0 } });
+    assert.equal(turnEdited(turn), false);
   });
 });

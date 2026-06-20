@@ -1,8 +1,43 @@
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 
 const COMPLETION_STATUSES = ['DONE', 'DONE_WITH_CONCERNS', 'BLOCKED', 'NEEDS_CONTEXT'];
+
+// ponytail: per-turn file-edit flag in /tmp. Gates the Stop completion-status block so advisory
+// (read-only / Q&A) turns are not forced to emit a status. Ceiling: edits made via shell tools
+// (sed -i, redirects) bypass this gate; upgrade by inspecting transcript_path rollout JSONL.
+const FILE_EDIT_TOOLS = new Set(['apply_patch', 'edit', 'write']);
+
+function editsDir() {
+  return path.join(os.tmpdir(), 'codex-jmp-hook-edits');
+}
+
+function flagPath(turnId) {
+  return path.join(editsDir(), `${turnId}.edit`);
+}
+
+export function isFileEditTool(name = '') {
+  return FILE_EDIT_TOOLS.has(String(name).toLowerCase());
+}
+
+export function markTurnEdited(turnId) {
+  if (!turnId) return;
+  fs.mkdirSync(editsDir(), { recursive: true });
+  fs.writeFileSync(flagPath(turnId), '');
+}
+
+// Returns true/false when turnId is present; null when unknown (no turnId) so callers can fall back.
+export function turnEdited(turnId) {
+  if (!turnId) return null;
+  return fs.existsSync(flagPath(turnId));
+}
+
+export function clearTurnEdited(turnId) {
+  if (!turnId) return;
+  try { fs.unlinkSync(flagPath(turnId)); } catch { /* already gone */ }
+}
 
 const SKILL_RULES = [
   {
@@ -126,6 +161,9 @@ export function buildHookResponse(payload = {}) {
   }
 
   if (eventName === 'PostToolUse') {
+    if (isFileEditTool(payload.tool_name)) {
+      markTurnEdited(payload.turn_id);
+    }
     if (detectUiTouched(payload)) {
       return additionalContextOutput('PostToolUse', 'UI files changed. Run `/imprint` before marking work complete.');
     }
@@ -148,14 +186,24 @@ export function buildHookResponse(payload = {}) {
       return null;
     }
 
-    if (!hasCompletionStatus(finalText)) {
-      return {
-        decision: 'block',
-        reason: 'Missing completion status. End with DONE, DONE_WITH_CONCERNS, BLOCKED, or NEEDS_CONTEXT plus evidence.',
-      };
+    const turnId = payload.turn_id;
+    const edited = turnEdited(turnId);
+
+    if (hasCompletionStatus(finalText)) {
+      clearTurnEdited(turnId);
+      return null;
     }
 
-    return null;
+    // Advisory turn (read-only / Q&A, no file edits recorded): do not force a status.
+    if (edited === false) {
+      return null;
+    }
+
+    // Real task (file edits this turn) or unknown (no turnId): enforce status.
+    return {
+      decision: 'block',
+      reason: 'Missing completion status. End with DONE, DONE_WITH_CONCERNS, BLOCKED, or NEEDS_CONTEXT plus evidence.',
+    };
   }
 
   return null;
