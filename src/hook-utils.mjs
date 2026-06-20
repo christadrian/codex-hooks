@@ -4,6 +4,7 @@ import path from 'node:path';
 import os from 'node:os';
 
 const COMPLETION_STATUSES = ['DONE', 'DONE_WITH_CONCERNS', 'BLOCKED', 'NEEDS_CONTEXT'];
+const COMPLETION_STATUS_RE = /(^|\n)(DONE|DONE_WITH_CONCERNS|BLOCKED|NEEDS_CONTEXT)(\b|:)/;
 
 // ponytail: per-turn file-edit flag in /tmp. Gates the Stop completion-status block so advisory
 // (read-only / Q&A) turns are not forced to emit a status. Ceiling: edits made via shell tools
@@ -82,25 +83,12 @@ export function detectLikelySkills(prompt = '') {
 }
 
 export function detectUiTouched(payload = {}) {
-  const raw = JSON.stringify(payload.tool_input ?? payload, null, 2);
+  const raw = JSON.stringify(payload.tool_input ?? payload);
   return /apply_patch|Edit|Write/i.test(payload.tool_name ?? raw) && UI_FILE_PATTERN.test(raw);
 }
 
 export function hasCompletionStatus(text = '') {
-  return COMPLETION_STATUSES.some((status) => new RegExp(`(^|\\n)${status}(\\b|:)`).test(text));
-}
-
-function lastAssistantText(transcript = []) {
-  for (let index = transcript.length - 1; index >= 0; index -= 1) {
-    const entry = transcript[index];
-    if (entry?.role === 'assistant') {
-      return Array.isArray(entry.content)
-        ? entry.content.map((part) => part.text ?? '').join('\n')
-        : String(entry.content ?? '');
-    }
-  }
-
-  return '';
+  return COMPLETION_STATUS_RE.test(text);
 }
 
 function stopText(payload = {}) {
@@ -110,10 +98,6 @@ function stopText(payload = {}) {
 
   if (Object.hasOwn(payload, 'last_assistant_message')) {
     return String(payload.last_assistant_message ?? '');
-  }
-
-  if (Array.isArray(payload.transcript)) {
-    return lastAssistantText(payload.transcript);
   }
 
   return null;
@@ -209,19 +193,6 @@ export function buildHookResponse(payload = {}) {
   return null;
 }
 
-export function createUserHookConfig(repoPath) {
-  const command = `node ${JSON.stringify(path.join(repoPath, 'bin/codex-jmp-hook.mjs'))}`;
-
-  return {
-    hooks: {
-      SessionStart: [{ hooks: [{ type: 'command', command }] }],
-      UserPromptSubmit: [{ hooks: [{ type: 'command', command }] }],
-      PostToolUse: [{ matcher: 'apply_patch|Edit|Write|Bash', hooks: [{ type: 'command', command }] }],
-      Stop: [{ hooks: [{ type: 'command', command }] }],
-    },
-  };
-}
-
 export function createUserHookToml(repoPath) {
   const command = `node ${JSON.stringify(path.join(repoPath, 'bin/codex-jmp-hook.mjs'))}`;
 
@@ -283,27 +254,13 @@ export function writeFileAtomic(filePath, contents) {
   }
 }
 
-export function mergeHooksConfig(existing = {}, addition = {}) {
-  const next = { ...existing, hooks: { ...(existing.hooks ?? {}) } };
-
-  for (const [eventName, entries] of Object.entries(addition.hooks ?? {})) {
-    next.hooks[eventName] = [...(next.hooks[eventName] ?? []), ...entries];
-  }
-
-  return next;
-}
-
-function hookEntryContainsCommand(entry = {}, command) {
-  return (entry.hooks ?? []).some((hook) => hook.command === command);
-}
-
 export function removeCommandFromHooksConfig(existing = {}, command) {
   const next = { ...existing, hooks: {} };
 
   for (const [eventName, entries] of Object.entries(existing.hooks ?? {})) {
     const keptEntries = entries
       .map((entry) => {
-        const hadCommand = hookEntryContainsCommand(entry, command);
+        const hadCommand = (entry.hooks ?? []).some((hook) => hook.command === command);
 
         return {
           entry: {

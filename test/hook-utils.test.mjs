@@ -8,13 +8,11 @@ import {
   turnEdited,
   buildHookResponse,
   createUserHookCommand,
-  createUserHookConfig,
   createUserHookToml,
   detectLikelySkills,
   detectUiTouched,
   hasAnyHooks,
   hasCompletionStatus,
-  mergeHooksConfig,
   mergeHooksToml,
   removeCommandFromHooksConfig,
 } from '../src/hook-utils.mjs';
@@ -93,16 +91,6 @@ describe('buildHookResponse', () => {
     assert.equal(buildHookResponse({ hook_event_name: 'UserPromptSubmit', prompt: 'hello' }), null);
   });
 
-  it('blocks Stop when final status is missing', () => {
-    const response = buildHookResponse({
-      hook_event_name: 'Stop',
-      transcript: [{ role: 'assistant', content: 'Tests pass.' }],
-    });
-
-    assert.equal(response.decision, 'block');
-    assert.match(response.reason, /completion status/i);
-  });
-
   it('blocks Stop when Codex last_assistant_message is missing final status', () => {
     const response = buildHookResponse({
       hook_event_name: 'Stop',
@@ -115,15 +103,6 @@ describe('buildHookResponse', () => {
 
   it('returns null for allowed Stop when Codex does not provide final response text', () => {
     const response = buildHookResponse({ hook_event_name: 'Stop' });
-
-    assert.equal(response, null);
-  });
-
-  it('returns null for allowed Stop when final status exists', () => {
-    const response = buildHookResponse({
-      hook_event_name: 'Stop',
-      transcript: [{ role: 'assistant', content: 'DONE\nTests: npm test' }],
-    });
 
     assert.equal(response, null);
   });
@@ -162,22 +141,6 @@ describe('expanded skill routing', () => {
   it('routes ship and release prompts to review', () => {
     assert.deepEqual(detectLikelySkills('Ship this package'), ['review']);
     assert.deepEqual(detectLikelySkills('Release the hook update'), ['review']);
-  });
-});
-
-describe('mergeHooksConfig', () => {
-  it('merges this package hooks without deleting existing hooks', () => {
-    const existing = {
-      hooks: {
-        Stop: [{ command: 'echo existing' }],
-      },
-    };
-
-    const next = mergeHooksConfig(existing, createUserHookConfig('/repo'));
-
-    assert.equal(next.hooks.Stop.length, 2);
-    assert.equal(next.hooks.SessionStart.length, 1);
-    assert.match(next.hooks.Stop[1].hooks[0].command, /codex-jmp-hook/);
   });
 });
 
