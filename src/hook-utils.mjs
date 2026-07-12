@@ -4,7 +4,7 @@ import path from 'node:path';
 import os from 'node:os';
 
 const COMPLETION_STATUSES = ['DONE', 'DONE_WITH_CONCERNS', 'BLOCKED', 'NEEDS_CONTEXT'];
-const COMPLETION_STATUS_RE = /(^|\n)(DONE|DONE_WITH_CONCERNS|BLOCKED|NEEDS_CONTEXT)(\b|:)/;
+const COMPLETION_STATUS_RE = /(^|\n)(DONE|DONE_WITH_CONCERNS|BLOCKED|NEEDS_CONTEXT)(?::[^\n]*)?\s*$/;
 
 // ponytail: per-turn file-edit flag in /tmp. Gates the Stop completion-status block so advisory
 // (read-only / Q&A) turns are not forced to emit a status. Ceiling: edits made via shell tools
@@ -152,9 +152,9 @@ export function buildHookResponse(payload = {}) {
       return additionalContextOutput('PostToolUse', 'UI files changed. Run `/imprint` before marking work complete.');
     }
 
-    const exitCode = payload.tool_response?.exit_code ?? payload.tool_response?.exitCode;
+    const exitCode = Number(payload.tool_response?.exit_code ?? payload.tool_response?.exitCode ?? 0);
 
-    if (exitCode && exitCode !== 0) {
+    if (exitCode !== 0) {
       return additionalContextOutput(
         'PostToolUse',
         'Tool failed. If this is repeated or unclear, use `/recover` before patching further.',

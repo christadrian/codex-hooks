@@ -31,7 +31,7 @@ describe('codex-jmp-hook CLI', () => {
   it('emits no stdout for allowed Stop responses because Stop only accepts decision:block', () => {
     const result = spawnSync(process.execPath, ['bin/codex-jmp-hook.mjs'], {
       cwd: path.resolve('.'),
-      input: JSON.stringify({ hook_event_name: 'Stop', last_assistant_message: 'DONE\nTests: npm test' }),
+      input: JSON.stringify({ hook_event_name: 'Stop', last_assistant_message: 'Tests: npm test\nDONE' }),
       encoding: 'utf8',
     });
 

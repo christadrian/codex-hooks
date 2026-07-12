@@ -59,6 +59,16 @@ const cases = [
     input: { hook_event_name: 'UserPromptSubmit', prompt: 'Release the hook package' },
     expect: /"hookEventName":"UserPromptSubmit"[\s\S]*Use `review`/,
   },
+  {
+    name: 'blocks status that is not the final line',
+    input: { hook_event_name: 'Stop', last_assistant_message: 'DONE\nTests pass.' },
+    expect: /Missing completion status/,
+  },
+  {
+    name: 'allows status on the final line',
+    input: { hook_event_name: 'Stop', last_assistant_message: 'Tests pass.\nDONE' },
+    expectEqual: null,
+  },
 ];
 
 let passed = 0;

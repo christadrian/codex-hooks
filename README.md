@@ -17,7 +17,7 @@ The hooks do not replace skills. They add deterministic reminders and gates so a
 | `SessionStart` | Adds context about installed workflow skills and `memory.md` restore/save usage. |
 | `UserPromptSubmit` | Routes prompts to likely JavaScript-Mastery-Pro skills. |
 | `PostToolUse` | Detects UI file edits and asks for `/imprint`; warns after failed tool runs. |
-| `Stop` | Blocks final responses that omit `DONE`, `DONE_WITH_CONCERNS`, `BLOCKED`, or `NEEDS_CONTEXT` **only when the turn edited files** (`apply_patch`/`Edit`/`Write`). Advisory / read-only turns are not forced to emit a status. |
+| `Stop` | Blocks edited turns unless the final non-empty line starts with `DONE`, `DONE_WITH_CONCERNS`, `BLOCKED`, or `NEEDS_CONTEXT`. Advisory / read-only turns are not forced to emit a status. |
 
 ## User-Level Install
 

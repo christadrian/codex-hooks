@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { afterEach, describe, it } from 'node:test';
 
 import {
   clearTurnEdited,
@@ -57,14 +57,20 @@ describe('detectUiTouched', () => {
 
 describe('hasCompletionStatus', () => {
   it('accepts AGENTS completion statuses', () => {
-    assert.equal(hasCompletionStatus('DONE\nTests: npm test'), true);
-    assert.equal(hasCompletionStatus('DONE_WITH_CONCERNS\nTests blocked'), true);
-    assert.equal(hasCompletionStatus('BLOCKED\nNeed credentials'), true);
-    assert.equal(hasCompletionStatus('NEEDS_CONTEXT\nNeed repo'), true);
+    assert.equal(hasCompletionStatus('Tests: npm test\nDONE'), true);
+    assert.equal(hasCompletionStatus('Tests blocked\nDONE_WITH_CONCERNS'), true);
+    assert.equal(hasCompletionStatus('Need credentials\nBLOCKED'), true);
+    assert.equal(hasCompletionStatus('Need repo\nNEEDS_CONTEXT'), true);
   });
 
   it('rejects missing completion status', () => {
     assert.equal(hasCompletionStatus('Implemented hook package. Tests pass.'), false);
+  });
+
+  it('requires the completion status at the end', () => {
+    assert.equal(hasCompletionStatus('DONE\nTests: npm test'), false);
+    assert.equal(hasCompletionStatus('Tests: npm test\nDONE'), true);
+    assert.equal(hasCompletionStatus('Tests: npm test\nDONE: ready to merge'), true);
   });
 });
 
@@ -110,7 +116,7 @@ describe('buildHookResponse', () => {
   it('returns null for allowed Stop when Codex last_assistant_message has final status', () => {
     const response = buildHookResponse({
       hook_event_name: 'Stop',
-      last_assistant_message: 'DONE\nTests: npm test',
+      last_assistant_message: 'Tests: npm test\nDONE',
     });
 
     assert.equal(response, null);
@@ -125,6 +131,14 @@ describe('buildHookResponse', () => {
 
     assert.equal(response.hookSpecificOutput.hookEventName, 'PostToolUse');
     assert.match(response.hookSpecificOutput.additionalContext, /use `\/recover`/i);
+  });
+
+  it('does not warn when a tool reports string exit code zero', () => {
+    assert.equal(buildHookResponse({
+      hook_event_name: 'PostToolUse',
+      tool_name: 'Bash',
+      tool_response: { exitCode: '0' },
+    }), null);
   });
 });
 
@@ -281,7 +295,7 @@ describe('Stop completion-status gating by file edits', () => {
       const response = buildHookResponse({
         hook_event_name: 'Stop',
         turn_id: turn,
-        last_assistant_message: 'DONE\nTests: npm test',
+        last_assistant_message: 'Tests: npm test\nDONE',
       });
       assert.equal(response, null);
       assert.equal(turnEdited(turn), false, 'flag should be cleared after success');
@@ -304,7 +318,7 @@ describe('Stop completion-status gating by file edits', () => {
       const second = buildHookResponse({
         hook_event_name: 'Stop',
         turn_id: turn,
-        last_assistant_message: 'DONE\nTests: npm test',
+        last_assistant_message: 'Tests: npm test\nDONE',
       });
       assert.equal(second, null);
       assert.equal(turnEdited(turn), false);
