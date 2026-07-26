@@ -47,7 +47,7 @@ const SKILL_RULES = [
   },
   {
     skill: 'remember',
-    pattern: /\b(remember|restore|resume|handoff|session|context)\b/i,
+    pattern: /\b(remember|memory\.md|handoff)\b|\/remember\b/i,
   },
   {
     skill: 'review',
@@ -122,7 +122,7 @@ function additionalContextOutput(hookEventName, additionalContext) {
 function sessionStartContext(cwd = process.cwd()) {
   const memoryPath = path.join(cwd, 'memory.md');
   const memoryLine = fs.existsSync(memoryPath)
-    ? 'Project has `memory.md`. Run `/remember restore` before continuing work.'
+    ? 'Project has `memory.md`. Run `/remember restore` only when you explicitly need the previous session handoff.'
     : 'No project `memory.md` found. At session end, run `/remember save` when useful.';
 
   return [

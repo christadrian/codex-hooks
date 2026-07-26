@@ -29,6 +29,14 @@ describe('detectLikelySkills', () => {
   it('routes UI prompts to imprint after architect', () => {
     assert.deepEqual(detectLikelySkills('Create a dashboard card component'), ['architect', 'imprint']);
   });
+
+  it('does not route generic context or session wording to remember', () => {
+    assert.deepEqual(detectLikelySkills('Continue this session with the available context'), []);
+  });
+
+  it('routes explicit memory handoffs to remember', () => {
+    assert.deepEqual(detectLikelySkills('Restore memory.md for this handoff'), ['remember']);
+  });
 });
 
 describe('detectUiTouched', () => {
@@ -91,6 +99,7 @@ describe('buildHookResponse', () => {
 
     assert.equal(response.hookSpecificOutput.hookEventName, 'SessionStart');
     assert.match(response.hookSpecificOutput.additionalContext, /workflow installed/);
+    assert.doesNotMatch(response.hookSpecificOutput.additionalContext, /before continuing work/);
   });
 
   it('returns null for no-op UserPromptSubmit output so CLI can stay silent', () => {

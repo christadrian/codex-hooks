@@ -60,6 +60,16 @@ const cases = [
     expect: /"hookEventName":"UserPromptSubmit"[\s\S]*Use `review`/,
   },
   {
+    name: 'does not restore memory for generic context wording',
+    input: { hook_event_name: 'UserPromptSubmit', prompt: 'Continue with the current session context' },
+    expectEqual: null,
+  },
+  {
+    name: 'routes explicit memory handoff to remember',
+    input: { hook_event_name: 'UserPromptSubmit', prompt: 'Restore memory.md for this handoff' },
+    expect: /"hookEventName":"UserPromptSubmit"[\s\S]*Use `remember`/,
+  },
+  {
     name: 'blocks status that is not the final line',
     input: { hook_event_name: 'Stop', last_assistant_message: 'DONE\nTests pass.' },
     expect: /Missing completion status/,

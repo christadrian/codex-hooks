@@ -10,11 +10,13 @@ Codex lifecycle hooks for the installed `JavaScript-Mastery-Pro/skills` workflow
 
 The hooks do not replace skills. They add deterministic reminders and gates so agents use the right workflow at the right time.
 
+`/remember restore` is never automatic. Run it explicitly for a previous-session handoff; ordinary prompts containing words such as “context,” “session,” “resume,” or “restore” do not trigger it.
+
 ## What It Does
 
 | Codex event | Behavior |
 | --- | --- |
-| `SessionStart` | Adds context about installed workflow skills and `memory.md` restore/save usage. |
+| `SessionStart` | Notes whether `memory.md` exists. Restore remains opt-in. |
 | `UserPromptSubmit` | Routes prompts to likely JavaScript-Mastery-Pro skills. |
 | `PostToolUse` | Detects UI file edits and asks for `/imprint`; warns after failed tool runs. |
 | `Stop` | Blocks edited turns unless the final non-empty line starts with `DONE`, `DONE_WITH_CONCERNS`, `BLOCKED`, or `NEEDS_CONTEXT`. Advisory / read-only turns are not forced to emit a status. |
