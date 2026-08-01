@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { describe, it } from 'node:test';
+import { STOP_BLOCK_REASON } from '../src/hook-utils.mjs';
 
 describe('codex-jmp-hook CLI', () => {
   it('emits no stdout on malformed stdin because approve decisions are invalid for Stop', () => {
@@ -50,7 +51,7 @@ describe('codex-jmp-hook CLI', () => {
     assert.equal(result.status, 0);
     assert.deepEqual(JSON.parse(result.stdout), {
       decision: 'block',
-      reason: 'Missing completion status. End with DONE, DONE_WITH_CONCERNS, BLOCKED, or NEEDS_CONTEXT plus evidence.',
+      reason: STOP_BLOCK_REASON,
     });
     assert.equal(result.stderr, '');
   });

@@ -1,37 +1,50 @@
 # Codex JavaScript-Mastery-Pro Hooks
 
-Codex lifecycle hooks for the installed `JavaScript-Mastery-Pro/skills` workflow:
+Codex lifecycle hooks that enforce a few deterministic gates and issue rare high-precision skill nudges.
 
-- `/architect` before meaningful build work
-- `/review` before shipping
-- `/recover` when a session or fix loop goes wrong
-- `/imprint` after UI component edits
-- `/remember` for session restore/save hygiene
+They do **not** replace `~/.codex/AGENTS.md`.
 
-The hooks do not replace skills. They add deterministic reminders and gates so agents use the right workflow at the right time.
+Split:
 
-`/remember restore` is never automatic. Run it explicitly for a previous-session handoff; ordinary prompts containing words such as “context,” “session,” “resume,” or “restore” do not trigger it.
+- **AGENTS.md** = policy
+- **Ponytail** = implementation shape
+- **these hooks** = hard gates + quiet nudges
+- **skills** = deep playbooks only when precisely matched
 
-## What It Does
+## Behavior
 
 | Codex event | Behavior |
 | --- | --- |
-| `SessionStart` | Notes whether `memory.md` exists. Restore remains opt-in. |
-| `UserPromptSubmit` | Routes prompts to likely JavaScript-Mastery-Pro skills. |
-| `PostToolUse` | Detects UI file edits and asks for `/imprint`; warns after failed tool runs. |
-| `Stop` | Blocks edited turns unless the final non-empty line starts with `DONE`, `DONE_WITH_CONCERNS`, `BLOCKED`, or `NEEDS_CONTEXT`. Advisory / read-only turns are not forced to emit a status. |
+| `SessionStart` | Injects the operating split, memory hygiene, and completion-status reminder. |
+| `UserPromptSubmit` | Routes only high-precision prompts to `/architect`, `/review`, `/recover`, `/imprint`, `/remember`. Ordinary "add/create/fix/button" prompts stay silent. |
+| `PostToolUse` | Marks real file mutations (direct edit tools + mutating shell commands). Nudges `/imprint` only for substantial visual/UI contract work. Warns after failed tools. |
+| `Stop` | Blocks edited turns unless the final non-empty line starts with `DONE`, `DONE_WITH_CONCERNS`, `BLOCKED`, or `NEEDS_CONTEXT`. Advisory/read-only turns are not forced to emit a status. |
 
-## User-Level Install
+Hard rules these hooks will **not** impose:
 
-Install into `~/.codex/config.toml` after cloning this repo:
+- UI chrome tests
+- evals for ordinary non-LLM work
+- mandatory `/architect` or `/imprint` on every change
+
+`/remember restore` is never automatic.
+
+## User-level install
 
 ```bash
 npm run install:user
 ```
 
-The installer writes a managed hook block into `config.toml`. This package uses user-level hooks only so a project checkout does not run the same hook twice. If an older install put these same hooks in `~/.codex/hooks.json`, the installer migrates only this package's hooks out of that legacy file and preserves unrelated hooks.
+Installs a managed block into `~/.codex/config.toml` between:
 
-## Test And Eval
+```toml
+# BEGIN codex-javascript-mastery-hooks
+...
+# END codex-javascript-mastery-hooks
+```
+
+Re-running install replaces that block cleanly. Legacy unscoped `codex-jmp-hook.mjs` entries are stripped first so duplicates are not created. Unrelated hooks such as `codex-wakatime` are preserved.
+
+## Test and eval
 
 ```bash
 npm run check
@@ -39,19 +52,8 @@ npm run check
 
 `npm test` is the deterministic gate suite. `npm run eval` scores workflow behavior against representative hook inputs.
 
-## GitHub Publish
-
-After adding a remote:
+## Hook input contract
 
 ```bash
-git remote add origin git@github.com:<owner>/<repo>.git
-git push -u origin main
-```
-
-## Hook Input Contract
-
-The CLI reads Codex hook JSON from stdin and writes JSON to stdout. Example:
-
-```bash
-printf '{"hook_event_name":"UserPromptSubmit","prompt":"Create a dashboard card component"}' | node bin/codex-jmp-hook.mjs
+printf '{"hook_event_name":"UserPromptSubmit","prompt":"Greenfield system design for billing"}' | node bin/codex-jmp-hook.mjs
 ```

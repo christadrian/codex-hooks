@@ -11,23 +11,47 @@ import {
   createUserHookToml,
   detectLikelySkills,
   detectUiTouched,
+  detectVisualContractWork,
   hasAnyHooks,
   hasCompletionStatus,
   mergeHooksToml,
+  mentionsUiChromeTests,
   removeCommandFromHooksConfig,
+  shellLooksLikeMutation,
+  shouldMarkTurnEdited,
+  stripLegacyJmpHooks,
 } from '../src/hook-utils.mjs';
 
 describe('detectLikelySkills', () => {
-  it('routes build prompts to architect', () => {
-    assert.deepEqual(detectLikelySkills('Build a reusable settings panel'), ['architect']);
+  it('routes explicit architecture prompts to architect', () => {
+    assert.deepEqual(detectLikelySkills('Need system design for a new billing service'), ['architect']);
+    assert.deepEqual(detectLikelySkills('Greenfield architecture for checkout'), ['architect']);
   });
 
-  it('routes broken prompts to recover', () => {
+  it('does not route ordinary add/create prompts to architect', () => {
+    assert.deepEqual(detectLikelySkills('Add a config flag for retries'), []);
+    assert.deepEqual(detectLikelySkills('Create a script to rename files'), []);
+    assert.deepEqual(detectLikelySkills('Build a reusable settings panel'), []);
+  });
+
+  it('routes repeated-failure prompts to recover', () => {
     assert.deepEqual(detectLikelySkills('This build keeps failing after three fixes'), ['recover']);
+    assert.deepEqual(detectLikelySkills('Still broken after the last patch'), ['recover']);
   });
 
-  it('routes UI prompts to imprint after architect', () => {
-    assert.deepEqual(detectLikelySkills('Create a dashboard card component'), ['architect', 'imprint']);
+  it('does not route a plain fix prompt to recover', () => {
+    assert.deepEqual(detectLikelySkills('Fix the off-by-one in parser.py'), []);
+    assert.deepEqual(detectLikelySkills('Debug this later maybe'), []);
+  });
+
+  it('routes explicit visual-contract prompts to imprint only', () => {
+    assert.deepEqual(detectLikelySkills('Polish the dashboard against the design system'), ['imprint']);
+    assert.deepEqual(detectLikelySkills('Match the Figma card spacing'), ['imprint']);
+  });
+
+  it('does not route generic button/UI wording to imprint', () => {
+    assert.deepEqual(detectLikelySkills('Fix the submit button loading state'), []);
+    assert.deepEqual(detectLikelySkills('Create a dashboard card component'), []);
   });
 
   it('does not route generic context or session wording to remember', () => {
@@ -36,6 +60,13 @@ describe('detectLikelySkills', () => {
 
   it('routes explicit memory handoffs to remember', () => {
     assert.deepEqual(detectLikelySkills('Restore memory.md for this handoff'), ['remember']);
+    assert.deepEqual(detectLikelySkills('Run /remember restore'), ['remember']);
+  });
+
+  it('routes explicit review language only', () => {
+    assert.deepEqual(detectLikelySkills('Ready to ship after code review'), ['review']);
+    assert.deepEqual(detectLikelySkills('Ship this package'), []);
+    assert.deepEqual(detectLikelySkills('Release the hook update'), []);
   });
 });
 
@@ -63,6 +94,35 @@ describe('detectUiTouched', () => {
   });
 });
 
+describe('detectVisualContractWork', () => {
+  it('requires design-system intent or substantial new UI surface', () => {
+    assert.equal(
+      detectVisualContractWork({
+        tool_name: 'apply_patch',
+        tool_input: { patch: '*** Add File: components/Card.tsx\n+export function Card() { return <div /> }' },
+      }),
+      true,
+    );
+
+    assert.equal(
+      detectVisualContractWork({
+        tool_name: 'apply_patch',
+        tool_input: { patch: '*** Update File: components/Card.tsx\n-const x=1\n+const x=2' },
+      }),
+      false,
+    );
+
+    assert.equal(
+      detectVisualContractWork({
+        prompt: 'Match the Figma spacing on the card',
+        tool_name: 'apply_patch',
+        tool_input: { patch: '*** Update File: components/Card.tsx\n+gap-2' },
+      }),
+      true,
+    );
+  });
+});
+
 describe('hasCompletionStatus', () => {
   it('accepts AGENTS completion statuses', () => {
     assert.equal(hasCompletionStatus('Tests: npm test\nDONE'), true);
@@ -82,23 +142,58 @@ describe('hasCompletionStatus', () => {
   });
 });
 
+describe('mentionsUiChromeTests', () => {
+  it('detects discouraged UI chrome verification language', () => {
+    assert.equal(mentionsUiChromeTests('Added button presence tests'), true);
+    assert.equal(mentionsUiChromeTests('Verification: unit tests for parser'), false);
+  });
+});
+
+describe('shell mutation detection', () => {
+  it('marks shell file mutations and ignores plain reads/builds', () => {
+    assert.equal(shellLooksLikeMutation('sed -i "s/a/b/" foo.txt'), true);
+    assert.equal(shellLooksLikeMutation('cat foo > bar.txt'), true);
+    assert.equal(shellLooksLikeMutation('git commit -m "x"'), true);
+    assert.equal(shellLooksLikeMutation('npm test'), false);
+    assert.equal(shellLooksLikeMutation('rg -n TODO src'), false);
+  });
+
+  it('shouldMarkTurnEdited accepts direct edits and mutating shells', () => {
+    assert.equal(shouldMarkTurnEdited({ tool_name: 'apply_patch' }), true);
+    assert.equal(shouldMarkTurnEdited({ tool_name: 'Bash', tool_input: { command: 'sed -i s/a/b/ file' } }), true);
+    assert.equal(shouldMarkTurnEdited({ tool_name: 'Bash', tool_input: { command: 'npm test' } }), false);
+    assert.equal(shouldMarkTurnEdited({ tool_name: 'exec_command', tool_input: { cmd: 'printf x > out.txt' } }), true);
+  });
+});
+
 describe('buildHookResponse', () => {
-  it('wraps UserPromptSubmit context in hookSpecificOutput', () => {
+  it('stays silent for ordinary feature prompts', () => {
+    assert.equal(
+      buildHookResponse({
+        hook_event_name: 'UserPromptSubmit',
+        prompt: 'Create a settings card component',
+      }),
+      null,
+    );
+  });
+
+  it('wraps high-precision UserPromptSubmit context in hookSpecificOutput', () => {
     const response = buildHookResponse({
       hook_event_name: 'UserPromptSubmit',
-      prompt: 'Build a profile card component',
+      prompt: 'Greenfield system design for a billing service',
     });
 
     assert.equal(response.hookSpecificOutput.hookEventName, 'UserPromptSubmit');
     assert.match(response.hookSpecificOutput.additionalContext, /Use `architect`/);
-    assert.match(response.hookSpecificOutput.additionalContext, /Use `imprint`/);
+    assert.doesNotMatch(response.hookSpecificOutput.additionalContext, /Use `imprint`/);
   });
 
-  it('wraps SessionStart context in hookSpecificOutput', () => {
+  it('wraps SessionStart context in hookSpecificOutput with operating split', () => {
     const response = buildHookResponse({ hook_event_name: 'SessionStart', cwd: process.cwd() });
 
     assert.equal(response.hookSpecificOutput.hookEventName, 'SessionStart');
-    assert.match(response.hookSpecificOutput.additionalContext, /workflow installed/);
+    assert.match(response.hookSpecificOutput.additionalContext, /Policy: AGENTS\.md/);
+    assert.match(response.hookSpecificOutput.additionalContext, /Ponytail/);
     assert.doesNotMatch(response.hookSpecificOutput.additionalContext, /before continuing work/);
   });
 
@@ -114,6 +209,7 @@ describe('buildHookResponse', () => {
 
     assert.equal(response.decision, 'block');
     assert.match(response.reason, /completion status/i);
+    assert.match(response.reason, /Evidence/);
   });
 
   it('returns null for allowed Stop when Codex does not provide final response text', () => {
@@ -143,27 +239,42 @@ describe('buildHookResponse', () => {
   });
 
   it('does not warn when a tool reports string exit code zero', () => {
-    assert.equal(buildHookResponse({
+    assert.equal(
+      buildHookResponse({
+        hook_event_name: 'PostToolUse',
+        tool_name: 'Bash',
+        tool_response: { exitCode: '0' },
+      }),
+      null,
+    );
+  });
+
+  it('nudge imprint only for substantial UI surface creation', () => {
+    const response = buildHookResponse({
       hook_event_name: 'PostToolUse',
-      tool_name: 'Bash',
-      tool_response: { exitCode: '0' },
-    }), null);
-  });
-});
+      tool_name: 'apply_patch',
+      turn_id: 'ui-create',
+      tool_input: {
+        patch: '*** Add File: components/SettingsCard.tsx\n+export function SettingsCard() { return null }',
+      },
+    });
 
-describe('expanded skill routing', () => {
-  it('routes troubleshooting prompts to recover', () => {
-    assert.deepEqual(detectLikelySkills('Debug this failing checkout flow'), ['recover']);
-    assert.deepEqual(detectLikelySkills('Troubleshoot the broken hook'), ['recover']);
-  });
-
-  it('routes refactor prompts to architect', () => {
-    assert.deepEqual(detectLikelySkills('Refactor the hook installer'), ['architect']);
+    assert.match(response.hookSpecificOutput.additionalContext, /\/imprint/);
+    assert.match(response.hookSpecificOutput.additionalContext, /Do not add button\/chrome tests/);
   });
 
-  it('routes ship and release prompts to review', () => {
-    assert.deepEqual(detectLikelySkills('Ship this package'), ['review']);
-    assert.deepEqual(detectLikelySkills('Release the hook update'), ['review']);
+  it('stays silent for tiny UI prop edits', () => {
+    assert.equal(
+      buildHookResponse({
+        hook_event_name: 'PostToolUse',
+        tool_name: 'apply_patch',
+        turn_id: 'ui-tiny',
+        tool_input: {
+          patch: '*** Update File: components/SettingsCard.tsx\n-disabled={false}\n+disabled={pending}',
+        },
+      }),
+      null,
+    );
   });
 });
 
@@ -184,6 +295,42 @@ describe('mergeHooksToml', () => {
     assert.equal((twice.match(/BEGIN codex-javascript-mastery-hooks/g) ?? []).length, 1);
     assert.match(twice, /new-repo/);
     assert.doesNotMatch(twice, /old-repo/);
+  });
+
+  it('strips legacy unscoped jmp hook tables before wrapping managed markers', () => {
+    const legacy = [
+      'model = "gpt-5"',
+      '',
+      '[[hooks.SessionStart]]',
+      '[[hooks.SessionStart.hooks]]',
+      'type = "command"',
+      'command = \'node "/old/bin/codex-jmp-hook.mjs"\'',
+      '',
+      '[[hooks.PostToolUse]]',
+      'matcher = "apply_patch"',
+      '[[hooks.PostToolUse.hooks]]',
+      'type = "command"',
+      'command = "codex-wakatime --hook"',
+      '',
+    ].join('\n');
+
+    const next = mergeHooksToml(legacy, '/repo');
+    assert.equal((next.match(/codex-jmp-hook\.mjs/g) ?? []).length, 4);
+    assert.match(next, /codex-wakatime --hook/);
+    assert.match(next, /# BEGIN codex-javascript-mastery-hooks/);
+  });
+});
+
+describe('stripLegacyJmpHooks', () => {
+  it('keeps unrelated hooks', () => {
+    const text = [
+      '[[hooks.Stop]]',
+      '[[hooks.Stop.hooks]]',
+      'command = "codex-wakatime --hook"',
+      '',
+    ].join('\n');
+
+    assert.match(stripLegacyJmpHooks(text), /codex-wakatime/);
   });
 });
 
@@ -215,6 +362,7 @@ describe('createUserHookToml', () => {
     assert.match(toml, /\[\[hooks\.UserPromptSubmit\]\]/);
     assert.match(toml, /\[\[hooks\.PostToolUse\]\]/);
     assert.match(toml, /\[\[hooks\.Stop\]\]/);
+    assert.match(toml, /exec_command/);
   });
 });
 
@@ -361,9 +509,25 @@ describe('PostToolUse records file edits by turn_id', () => {
     assert.equal(response, null, 'non-UI edit should still return null');
   });
 
-  it('does not mark the turn for Bash/exec_command', () => {
+  it('marks the turn for mutating Bash and not for plain Bash reads', () => {
     clearTurnEdited(turn);
-    buildHookResponse({ hook_event_name: 'PostToolUse', tool_name: 'Bash', turn_id: turn, tool_response: { exit_code: 0 } });
+    buildHookResponse({
+      hook_event_name: 'PostToolUse',
+      tool_name: 'Bash',
+      turn_id: turn,
+      tool_input: { command: 'sed -i s/a/b/ file.txt' },
+      tool_response: { exit_code: 0 },
+    });
+    assert.equal(turnEdited(turn), true);
+
+    clearTurnEdited(turn);
+    buildHookResponse({
+      hook_event_name: 'PostToolUse',
+      tool_name: 'Bash',
+      turn_id: turn,
+      tool_input: { command: 'rg -n TODO src' },
+      tool_response: { exit_code: 0 },
+    });
     assert.equal(turnEdited(turn), false);
   });
 });

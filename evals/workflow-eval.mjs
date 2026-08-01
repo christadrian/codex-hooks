@@ -4,18 +4,32 @@ import { buildHookResponse, clearTurnEdited, markTurnEdited } from '../src/hook-
 
 const cases = [
   {
-    name: 'routes new UI work to architect and imprint',
+    name: 'stays silent for ordinary UI feature prompts',
     input: { hook_event_name: 'UserPromptSubmit', prompt: 'Create a settings card component' },
-    expect: /"hookEventName":"UserPromptSubmit"[\s\S]*Use `architect`[\s\S]*Use `imprint`/,
+    expectEqual: null,
   },
   {
-    name: 'warns after UI patch',
+    name: 'routes greenfield architecture prompts to architect',
+    input: { hook_event_name: 'UserPromptSubmit', prompt: 'Greenfield system design for billing' },
+    expect: /"hookEventName":"UserPromptSubmit"[\s\S]*Use `architect`/,
+  },
+  {
+    name: 'warns after substantial UI surface creation',
     input: {
       hook_event_name: 'PostToolUse',
       tool_name: 'apply_patch',
-      tool_input: { patch: '*** Add File: components/SettingsCard.tsx' },
+      tool_input: { patch: '*** Add File: components/SettingsCard.tsx\n+export function SettingsCard(){return null}' },
     },
-    expect: /"hookEventName":"PostToolUse"[\s\S]*Run `\/imprint`/,
+    expect: /"hookEventName":"PostToolUse"[\s\S]*\/imprint/,
+  },
+  {
+    name: 'stays silent after tiny UI prop edits',
+    input: {
+      hook_event_name: 'PostToolUse',
+      tool_name: 'apply_patch',
+      tool_input: { patch: '*** Update File: components/SettingsCard.tsx\n-a\n+b' },
+    },
+    expectEqual: null,
   },
   {
     name: 'blocks missing completion status',
@@ -50,13 +64,18 @@ const cases = [
     expect: /recover/,
   },
   {
-    name: 'routes debug prompt to recover',
-    input: { hook_event_name: 'UserPromptSubmit', prompt: 'Debug this failing hook' },
+    name: 'routes repeated-failure prompt to recover',
+    input: { hook_event_name: 'UserPromptSubmit', prompt: 'This hook keeps failing after three patches' },
     expect: /"hookEventName":"UserPromptSubmit"[\s\S]*Use `recover`/,
   },
   {
-    name: 'routes release prompt to review',
+    name: 'does not route plain release wording to review',
     input: { hook_event_name: 'UserPromptSubmit', prompt: 'Release the hook package' },
+    expectEqual: null,
+  },
+  {
+    name: 'routes ready-to-ship review language',
+    input: { hook_event_name: 'UserPromptSubmit', prompt: 'Ready to ship after code review' },
     expect: /"hookEventName":"UserPromptSubmit"[\s\S]*Use `review`/,
   },
   {
@@ -79,6 +98,27 @@ const cases = [
     input: { hook_event_name: 'Stop', last_assistant_message: 'Tests pass.\nDONE' },
     expectEqual: null,
   },
+  {
+    name: 'marks mutating shell edits for Stop enforcement',
+    setup: () => clearTurnEdited('eval-shell'),
+    teardown: () => clearTurnEdited('eval-shell'),
+    input: {
+      hook_event_name: 'PostToolUse',
+      tool_name: 'Bash',
+      turn_id: 'eval-shell',
+      tool_input: { command: 'sed -i s/a/b/ file.txt' },
+      tool_response: { exit_code: 0 },
+    },
+    expectEqual: null,
+    after: () => {
+      const blocked = buildHookResponse({
+        hook_event_name: 'Stop',
+        turn_id: 'eval-shell',
+        last_assistant_message: 'Updated file via sed.',
+      });
+      assert.equal(blocked.decision, 'block');
+    },
+  },
 ];
 
 let passed = 0;
@@ -88,6 +128,7 @@ for (const testCase of cases) {
   let response;
   try {
     response = buildHookResponse(testCase.input);
+    if (typeof testCase.after === 'function') testCase.after(response);
   } finally {
     if (typeof testCase.teardown === 'function') testCase.teardown();
   }
