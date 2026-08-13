@@ -7,9 +7,8 @@
     {
       "name": "codex-javascript-mastery-hooks",
       "source": {
-        "source": "url",
-        "url": "https://github.com/christadrian/codex-hooks.git",
-        "ref": "main"
+        "source": "local",
+        "path": "."
       },
       "policy": {
         "installation": "AVAILABLE",
