@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -63,13 +63,26 @@ const STOP_BLOCK_REASON = [
   'Preferred shape: Evidence / Verification / Restart / Next, then the status line.',
   'Advisory read-only turns do not need a status. Do not add UI chrome tests to satisfy gates.',
 ].join(' ');
+const MAX_STOP_BLOCKS = 3;
 
 function editsDir() {
   return path.join(os.tmpdir(), 'codex-jmp-hook-edits');
 }
 
-function flagPath(turnId) {
-  return path.join(editsDir(), `${turnId}.edit`);
+function stateId(value) {
+  return value ? createHash('sha256').update(String(value)).digest('hex') : null;
+}
+
+function flagPath(key) {
+  return path.join(editsDir(), `${stateId(key)}.edit`);
+}
+
+function retryPath(key) {
+  return path.join(editsDir(), `${stateId(key)}.retry`);
+}
+
+function payloadStateKey(payload = {}) {
+  return payload.transcript_path || payload.turn_id || payload.session_id || null;
 }
 
 export function isFileEditTool(name = '') {
@@ -105,25 +118,41 @@ export function shouldMarkTurnEdited(payload = {}) {
   return false;
 }
 
-export function markTurnEdited(turnId) {
-  if (!turnId) return;
+export function markTurnEdited(key) {
+  if (!key) return;
   fs.mkdirSync(editsDir(), { recursive: true });
-  fs.writeFileSync(flagPath(turnId), '');
+  fs.writeFileSync(flagPath(key), '');
 }
 
-// Returns true/false when turnId is present; null when unknown (no turnId) so callers can fall back.
-export function turnEdited(turnId) {
-  if (!turnId) return null;
-  return fs.existsSync(flagPath(turnId));
+// Returns true/false when a state key is present; null when unknown so callers can fall back.
+export function turnEdited(key) {
+  if (!key) return null;
+  return fs.existsSync(flagPath(key));
 }
 
-export function clearTurnEdited(turnId) {
-  if (!turnId) return;
-  try {
-    fs.unlinkSync(flagPath(turnId));
-  } catch {
-    /* already gone */
+export function clearTurnEdited(key) {
+  if (!key) return;
+  for (const file of [flagPath(key), retryPath(key)]) {
+    try {
+      fs.unlinkSync(file);
+    } catch {
+      /* already gone */
+    }
   }
+}
+
+function incrementStopBlocks(key) {
+  if (!key) return 1;
+  fs.mkdirSync(editsDir(), { recursive: true });
+  let previous = 0;
+  try {
+    previous = Number.parseInt(fs.readFileSync(retryPath(key), 'utf8'), 10) || 0;
+  } catch {
+    /* first block */
+  }
+  const count = previous + 1;
+  fs.writeFileSync(retryPath(key), String(count));
+  return count;
 }
 
 export function detectLikelySkills(prompt = '') {
@@ -239,7 +268,7 @@ export function buildHookResponse(payload = {}) {
 
   if (eventName === 'PostToolUse') {
     if (shouldMarkTurnEdited(payload)) {
-      markTurnEdited(payload.turn_id);
+      markTurnEdited(payloadStateKey(payload));
     }
 
     if (detectUiTouched(payload) && detectVisualContractWork(payload)) {
@@ -267,11 +296,11 @@ export function buildHookResponse(payload = {}) {
       return null;
     }
 
-    const turnId = payload.turn_id;
-    const edited = turnEdited(turnId);
+    const key = payloadStateKey(payload);
+    const edited = turnEdited(key);
 
     if (hasCompletionStatus(finalText)) {
-      clearTurnEdited(turnId);
+      clearTurnEdited(key);
 
       // Soft guidance only: never block for over-testing, just remind on edited turns.
       if (edited === true && mentionsUiChromeTests(finalText)) {
@@ -289,11 +318,23 @@ export function buildHookResponse(payload = {}) {
       return null;
     }
 
+    if (incrementStopBlocks(key) > MAX_STOP_BLOCKS) {
+      clearTurnEdited(key);
+      return {
+        systemMessage: 'Completion-status retry limit reached; allowing Stop to prevent an infinite continuation loop.',
+      };
+    }
+
     // Real task (file edits this turn) or unknown (no turnId): enforce status.
     return {
       decision: 'block',
       reason: STOP_BLOCK_REASON,
     };
+  }
+
+  if (eventName === 'SessionEnd') {
+    clearTurnEdited(payloadStateKey(payload));
+    return null;
   }
 
   return null;
@@ -321,6 +362,11 @@ export function createUserHookToml(repoPath) {
     '',
     '[[hooks.Stop]]',
     '[[hooks.Stop.hooks]]',
+    'type = "command"',
+    `command = ${JSON.stringify(command)}`,
+    '',
+    '[[hooks.SessionEnd]]',
+    '[[hooks.SessionEnd.hooks]]',
     'type = "command"',
     `command = ${JSON.stringify(command)}`,
     '',
@@ -380,7 +426,8 @@ export function stripLegacyJmpHooks(existingToml = '') {
 
 export function mergeHooksToml(existingToml = '', repoPath) {
   const managedBlock = [MANAGED_TOML_START, createUserHookToml(repoPath).trimEnd(), MANAGED_TOML_END].join('\n');
-  const trustState = existingToml.match(/\n(\[hooks\.state\][\s\S]*?)(?=\n# END codex-javascript-mastery-hooks)/)?.[1];
+  const managedRegion = existingToml.match(MANAGED_TOML_PATTERN)?.[0] ?? '';
+  const trustState = managedRegion.match(/(\[hooks\.state\][\s\S]*?)(?=\n\[\[hooks\.|\n# END codex-javascript-mastery-hooks)/)?.[1];
   const withoutManagedBlock = existingToml.replace(MANAGED_TOML_PATTERN, '\n');
   const withoutLegacy = stripLegacyJmpHooks(withoutManagedBlock).trimEnd();
 

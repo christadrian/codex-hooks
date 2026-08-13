@@ -19,6 +19,11 @@ Split:
 | `UserPromptSubmit` | Routes only high-precision prompts to `/architect`, `/review`, `/recover`, `/imprint`, `/remember`. Ordinary "add/create/fix/button" prompts stay silent. |
 | `PostToolUse` | Marks real file mutations (direct edit tools + mutating shell commands). Nudges `/imprint` only for substantial visual/UI contract work. Warns after failed tools. |
 | `Stop` | Blocks edited turns unless the final non-empty line starts with `DONE`, `DONE_WITH_CONCERNS`, `BLOCKED`, or `NEEDS_CONTEXT`. Advisory/read-only turns are not forced to emit a status. |
+| `SessionEnd` | Removes temporary edit/retry state for the session. |
+
+Stop state follows `transcript_path` across continuation turn IDs, with `turn_id` and `session_id` fallbacks. After three blocked retries, the hook allows Stop with a warning to prevent an infinite continuation loop.
+
+Set `CODEX_HOOKS_DEBUG=1` to append redacted payloads to `${PLUGIN_DATA}/hooks-debug.jsonl` (or the system temp directory for legacy installs). The log is mode `0600` and rotates at 1 MiB.
 
 Hard rules these hooks will **not** impose:
 

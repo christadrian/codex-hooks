@@ -48,6 +48,7 @@ describe('install-user-hook', () => {
     assert.match(configToml, /model = "gpt-5"/);
     assert.match(configToml, /# BEGIN codex-javascript-mastery-hooks/);
     assert.match(configToml, /\[\[hooks\.Stop\]\]/);
+    assert.match(configToml, /\[\[hooks\.SessionEnd\]\]/);
     assert.deepEqual(hooksJson.hooks.Stop, [{ hooks: [{ type: 'command', command: 'echo keep' }] }]);
   });
 

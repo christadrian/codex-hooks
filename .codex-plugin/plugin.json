@@ -1,6 +1,6 @@
 {
   "name": "codex-javascript-mastery-hooks",
-  "version": "0.1.0",
+  "version": "0.1.0+codex.20260813080740",
   "description": "Deterministic completion gates and high-precision workflow nudges for Codex.",
   "author": {
     "name": "christadrian",
@@ -15,7 +15,12 @@
     "longDescription": "Deterministic completion gates and high-precision workflow nudges for Codex.",
     "developerName": "christadrian",
     "category": "Productivity",
-    "capabilities": ["Read", "Write"],
-    "defaultPrompt": ["Apply the configured Codex completion gates to this task."]
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Apply the configured Codex completion gates to this task."
+    ]
   }
 }

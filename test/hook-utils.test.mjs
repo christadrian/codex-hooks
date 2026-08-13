@@ -320,6 +320,29 @@ describe('mergeHooksToml', () => {
     assert.doesNotMatch(next, /old-repo/);
   });
 
+  it('preserves mid-block trust state without retaining stale managed hooks', () => {
+    const installed = mergeHooksToml('', '/old-repo');
+    const withMidBlockState = installed.replace(
+      '[[hooks.PostToolUse]]',
+      [
+        '[hooks.state]',
+        '',
+        '[hooks.state."/home/user/.codex/config.toml:stop:0:0"]',
+        'trusted_hash = "sha256:abc123"',
+        '',
+        '[[hooks.PostToolUse]]',
+      ].join('\n'),
+    );
+
+    const next = mergeHooksToml(withMidBlockState, '/new-repo');
+
+    assert.equal((next.match(/\[\[hooks\.PostToolUse\]\]/g) ?? []).length, 1);
+    assert.equal((next.match(/\[\[hooks\.Stop\]\]/g) ?? []).length, 1);
+    assert.match(next, /trusted_hash = "sha256:abc123"/);
+    assert.match(next, /new-repo/);
+    assert.doesNotMatch(next, /old-repo/);
+  });
+
   it('strips legacy unscoped jmp hook tables before wrapping managed markers', () => {
     const legacy = [
       'model = "gpt-5"',
@@ -338,7 +361,7 @@ describe('mergeHooksToml', () => {
     ].join('\n');
 
     const next = mergeHooksToml(legacy, '/repo');
-    assert.equal((next.match(/codex-jmp-hook\.mjs/g) ?? []).length, 4);
+    assert.equal((next.match(/codex-jmp-hook\.mjs/g) ?? []).length, 5);
     assert.match(next, /codex-wakatime --hook/);
     assert.match(next, /# BEGIN codex-javascript-mastery-hooks/);
   });
@@ -378,13 +401,14 @@ describe('writeFileAtomic', () => {
 });
 
 describe('createUserHookToml', () => {
-  it('renders the four Codex hook events supported by this package', () => {
+  it('renders the five Codex hook events supported by this package', () => {
     const toml = createUserHookToml('/repo');
 
     assert.match(toml, /\[\[hooks\.SessionStart\]\]/);
     assert.match(toml, /\[\[hooks\.UserPromptSubmit\]\]/);
     assert.match(toml, /\[\[hooks\.PostToolUse\]\]/);
     assert.match(toml, /\[\[hooks\.Stop\]\]/);
+    assert.match(toml, /\[\[hooks\.SessionEnd\]\]/);
     assert.doesNotMatch(toml, /exec_command|Shell/);
   });
 });
@@ -513,6 +537,66 @@ describe('Stop completion-status gating by file edits', () => {
       last_assistant_message: 'Tests pass.',
     });
     assert.equal(response.decision, 'block');
+  });
+
+  it('keeps edit state across continuation turn ids using transcript_path', () => {
+    const transcript = '/tmp/codex-hooks-continuation.jsonl';
+    clearTurnEdited(transcript);
+    try {
+      buildHookResponse({
+        hook_event_name: 'PostToolUse',
+        tool_name: 'apply_patch',
+        turn_id: 'first-turn',
+        transcript_path: transcript,
+      });
+
+      const response = buildHookResponse({
+        hook_event_name: 'Stop',
+        turn_id: 'continuation-turn',
+        transcript_path: transcript,
+        stop_hook_active: true,
+        last_assistant_message: 'Still missing status.',
+      });
+
+      assert.equal(response.decision, 'block');
+    } finally {
+      clearTurnEdited(transcript);
+    }
+  });
+
+  it('allows after three blocked Stop retries and clears state', () => {
+    const transcript = '/tmp/codex-hooks-bounded-retry.jsonl';
+    clearTurnEdited(transcript);
+    try {
+      markTurnEdited(transcript);
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const response = buildHookResponse({
+          hook_event_name: 'Stop',
+          transcript_path: transcript,
+          stop_hook_active: attempt > 0,
+          last_assistant_message: 'Still missing status.',
+        });
+        assert.equal(response.decision, 'block');
+      }
+
+      const response = buildHookResponse({
+        hook_event_name: 'Stop',
+        transcript_path: transcript,
+        stop_hook_active: true,
+        last_assistant_message: 'Still missing status.',
+      });
+      assert.match(response.systemMessage, /retry limit/i);
+      assert.equal(turnEdited(transcript), false);
+    } finally {
+      clearTurnEdited(transcript);
+    }
+  });
+
+  it('cleans session state on SessionEnd', () => {
+    const transcript = '/tmp/codex-hooks-session-end.jsonl';
+    markTurnEdited(transcript);
+    assert.equal(buildHookResponse({ hook_event_name: 'SessionEnd', transcript_path: transcript }), null);
+    assert.equal(turnEdited(transcript), false);
   });
 });
 
