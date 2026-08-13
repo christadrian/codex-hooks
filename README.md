@@ -32,6 +32,11 @@ Hard rules these hooks will **not** impose:
 
 The repository is a Codex plugin. Its lifecycle hooks live in `hooks/hooks.json` and resolve the runtime through `${PLUGIN_ROOT}`, so plugin installs do not modify `~/.codex/config.toml` or depend on the repository's absolute path.
 
+```bash
+codex plugin marketplace add christadrian/codex-hooks --ref main
+codex plugin add codex-javascript-mastery-hooks@codex-hooks
+```
+
 Plugin hooks still require review through `/hooks` before Codex runs them.
 
 ## Legacy user-level install
