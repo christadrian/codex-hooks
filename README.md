@@ -16,7 +16,7 @@ Split:
 | Codex event | Behavior |
 | --- | --- |
 | `SessionStart` | Injects the operating split, memory hygiene, and completion-status reminder. |
-| `UserPromptSubmit` | Routes only high-precision prompts to `/architect`, `/review`, `/recover`, `/imprint`, `/remember`. Ordinary "add/create/fix/button" prompts stay silent. |
+| `UserPromptSubmit` | Routes high-precision prompts to the matching JS Mastery Pro phase: `/scope`, `/audit`, `/architect`, `/develop`, `/check verify`, `/test`, `/check review`, `/document`, `/sync`, or `/debug`. Legacy `/imprint` and `/remember` remain available. |
 | `PostToolUse` | Marks real file mutations (direct edit tools + mutating shell commands). Nudges `/imprint` only for substantial visual/UI contract work. Warns after failed tools. |
 | `Stop` | Blocks edited turns unless the final non-empty line starts with `DONE`, `DONE_WITH_CONCERNS`, `BLOCKED`, or `NEEDS_CONTEXT`. Advisory/read-only turns are not forced to emit a status. |
 | `SessionEnd` | Removes temporary edit/retry state for the session. |
@@ -29,9 +29,12 @@ Hard rules these hooks will **not** impose:
 
 - UI chrome tests
 - evals for ordinary non-LLM work
-- mandatory `/architect` or `/imprint` on every change
+- the full workflow on every change
+- a fixed verification tail that ignores the project's Prototype/Alpha/Beta/GA depth
 
 `/remember restore` is never automatic.
+
+The hooks follow the upstream workflow without owning its state or sequencing. `/scope` records the project's workflow depth, and that depth determines which stages follow `/develop`. The hooks only suggest a precisely matched entry point; they do not advance scope, specs, or statuses themselves.
 
 ## Plugin install
 

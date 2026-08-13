@@ -59,14 +59,29 @@ const cases = [
     expectEqual: null,
   },
   {
-    name: 'warns on failed camelCase tool response',
+    name: 'routes failed camelCase tool response to debug',
     input: { hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_response: { exitCode: 1 } },
-    expect: /recover/,
+    expect: /debug/,
   },
   {
-    name: 'routes repeated-failure prompt to recover',
+    name: 'routes a clear bug to debug',
+    input: { hook_event_name: 'UserPromptSubmit', prompt: 'Fix the off-by-one bug in the parser' },
+    expect: /"hookEventName":"UserPromptSubmit"[\s\S]*Use `debug`/,
+  },
+  {
+    name: 'routes repeated-failure prompt to debug',
     input: { hook_event_name: 'UserPromptSubmit', prompt: 'This hook keeps failing after three patches' },
-    expect: /"hookEventName":"UserPromptSubmit"[\s\S]*Use `recover`/,
+    expect: /"hookEventName":"UserPromptSubmit"[\s\S]*Use `debug`/,
+  },
+  {
+    name: 'routes MVP definition to scope',
+    input: { hook_event_name: 'UserPromptSubmit', prompt: 'Define the MVP for this product' },
+    expect: /"hookEventName":"UserPromptSubmit"[\s\S]*Use `scope`/,
+  },
+  {
+    name: 'routes AGENTS bootstrap to audit',
+    input: { hook_event_name: 'UserPromptSubmit', prompt: 'Bootstrap the project AGENTS.md' },
+    expect: /"hookEventName":"UserPromptSubmit"[\s\S]*Use `audit`/,
   },
   {
     name: 'does not route plain release wording to review',
@@ -76,7 +91,7 @@ const cases = [
   {
     name: 'routes ready-to-ship review language',
     input: { hook_event_name: 'UserPromptSubmit', prompt: 'Ready to ship after code review' },
-    expect: /"hookEventName":"UserPromptSubmit"[\s\S]*Use `review`/,
+    expect: /"hookEventName":"UserPromptSubmit"[\s\S]*Use `check review`/,
   },
   {
     name: 'does not restore memory for generic context wording',

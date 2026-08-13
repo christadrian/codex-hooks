@@ -34,14 +34,25 @@ describe('detectLikelySkills', () => {
     assert.deepEqual(detectLikelySkills('Build a reusable settings panel'), []);
   });
 
-  it('routes repeated-failure prompts to recover', () => {
-    assert.deepEqual(detectLikelySkills('This build keeps failing after three fixes'), ['recover']);
-    assert.deepEqual(detectLikelySkills('Still broken after the last patch'), ['recover']);
+  it('routes bugs and repeated failures to debug', () => {
+    assert.deepEqual(detectLikelySkills('This build keeps failing after three fixes'), ['debug']);
+    assert.deepEqual(detectLikelySkills('Still broken after the last patch'), ['debug']);
+    assert.deepEqual(detectLikelySkills('Fix the off-by-one bug in parser.py'), ['debug']);
   });
 
-  it('does not route a plain fix prompt to recover', () => {
-    assert.deepEqual(detectLikelySkills('Fix the off-by-one in parser.py'), []);
+  it('does not route a vague future debug mention', () => {
+    assert.deepEqual(detectLikelySkills('Fix the wording in README.md'), []);
     assert.deepEqual(detectLikelySkills('Debug this later maybe'), []);
+  });
+
+  it('routes workflow entry points without forcing the full chain', () => {
+    assert.deepEqual(detectLikelySkills('Define the MVP for this product'), ['scope']);
+    assert.deepEqual(detectLikelySkills('Bootstrap the project AGENTS.md'), ['audit']);
+    assert.deepEqual(detectLikelySkills('Build this feature from the approved spec'), ['develop']);
+    assert.deepEqual(detectLikelySkills('Verify the real app against the acceptance criteria'), ['check verify']);
+    assert.deepEqual(detectLikelySkills('Write a test suite for the uncommitted changes'), ['test']);
+    assert.deepEqual(detectLikelySkills('Write the pull request description'), ['document']);
+    assert.deepEqual(detectLikelySkills('Reconcile AGENTS.md and spec status'), ['sync']);
   });
 
   it('routes explicit visual-contract prompts to imprint only', () => {
@@ -63,8 +74,8 @@ describe('detectLikelySkills', () => {
     assert.deepEqual(detectLikelySkills('Run /remember restore'), ['remember']);
   });
 
-  it('routes explicit review language only', () => {
-    assert.deepEqual(detectLikelySkills('Ready to ship after code review'), ['review']);
+  it('routes explicit review language to check review only', () => {
+    assert.deepEqual(detectLikelySkills('Ready to ship after code review'), ['check review']);
     assert.deepEqual(detectLikelySkills('Ship this package'), []);
     assert.deepEqual(detectLikelySkills('Release the hook update'), []);
   });
@@ -227,7 +238,7 @@ describe('buildHookResponse', () => {
     assert.equal(response, null);
   });
 
-  it('warns on failed tool responses that use camelCase exitCode', () => {
+  it('routes failed tool responses to debug when the cause is unclear', () => {
     const response = buildHookResponse({
       hook_event_name: 'PostToolUse',
       tool_name: 'Bash',
@@ -235,7 +246,7 @@ describe('buildHookResponse', () => {
     });
 
     assert.equal(response.hookSpecificOutput.hookEventName, 'PostToolUse');
-    assert.match(response.hookSpecificOutput.additionalContext, /use `\/recover`/i);
+    assert.match(response.hookSpecificOutput.additionalContext, /use `\/debug`/i);
   });
 
   it('does not warn when a tool reports string exit code zero', () => {

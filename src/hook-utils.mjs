@@ -32,23 +32,58 @@ const UI_FILE_PATTERN =
 // alone must not fire workflows.
 const SKILL_RULES = [
   {
-    skill: 'recover',
+    skill: 'debug',
     pattern:
-      /(?:(?:^|[\s`])\/recover\b|\bkeeps?\s+failing\b|\bfailing\s+after\b|\bstill\s+(?:broken|failing)\b|\bregression\b|\btroubleshoot(?:ing)?\b|\broot\s+cause\b|\bdebug(?:ging)?\s+this\s+(?:failing|broken|error|issue|bug)\b)/i,
+      /(?:(?:^|[\s`])\/debug\b|\broot\s+cause\b|\b(?:test|build|check)\s+(?:is\s+)?failing\b|\bfailing\s+after\b|\bstill\s+(?:broken|failing)\b|\b(?:bug|regression)\b|\b(?:throws?|crashes?)\b|\bbehaviou?r\s+(?:is\s+)?(?:wrong|broken)\b)/i,
+  },
+  {
+    skill: 'scope',
+    pattern:
+      /(?:(?:^|[\s`])\/scope\b|\bproduct\s+scope\b|\bdefine\s+(?:the\s+)?mvp\b|\bfeature\s+roadmap\b|\bplan\s+(?:a|the)\s+new\s+product\b|\bnew\s+(?:product|app|project|platform)\s+(?:idea|plan|scope)\b|\bwhat\s+should\s+we\s+build\s+(?:first|next)\b)/i,
+  },
+  {
+    skill: 'audit',
+    pattern:
+      /(?:(?:^|[\s`])\/audit(?:\s+[^\s`]+)?\b|\b(?:create|generate|bootstrap|seed|complete|gap[ -]?fill)\b[^\n]{0,80}\bAGENTS\.md\b|\bbootstrap\s+(?:the\s+)?project\s+context\b)/i,
   },
   {
     skill: 'remember',
     pattern: /(?:(?:^|[\s`])\/remember\b|\bmemory\.md\b|\bsession\s+handoff\b|\bhandoff\b)/i,
   },
   {
-    skill: 'review',
+    skill: 'check review',
     pattern:
-      /(?:(?:^|[\s`])\/review\b|\bcode\s+review\b|\bready\s+to\s+ship\b|\bproduction\s+ready\b|\bpre-?(?:ship|release)\b|\bship\s+check\b)/i,
+      /(?:(?:^|[\s`])\/check\s+review\b|\bcode\s+review\b|\bready\s+to\s+ship\b|\bproduction\s+ready\b|\bpre-?(?:ship|release)\b|\bship\s+check\b)/i,
   },
   {
     skill: 'architect',
     pattern:
-      /(?:(?:^|[\s`])\/architect\b|\bgreenfield\b|\bsystem\s+design\b|\barchitecture\b|\bscaffold(?:ing)?\s+(?:a|the|new)\b|\bnew\s+(?:service|app|project|platform)\b)/i,
+      /(?:(?:^|[\s`])\/architect\b|\bsystem\s+design\b|\barchitecture\b|\bload[ -]?bearing\s+(?:choice|decision)\b|\b(?:choose|pick|decide|design)\b[^\n]{0,60}\b(?:tech\s+stack|data\s+model|provider|page\s+design)\b)/i,
+  },
+  {
+    skill: 'develop',
+    pattern:
+      /(?:(?:^|[\s`])\/develop\b|\b(?:implement|build|execute)\b[^\n]{0,60}\b(?:approved\s+design|approved\s+spec|build\s+spec)\b|\bbuild\s+from\s+(?:the\s+)?spec\b)/i,
+  },
+  {
+    skill: 'check verify',
+    pattern:
+      /(?:(?:^|[\s`])\/check\s+verify\b|\bverify\b[^\n]{0,60}\b(?:real\s+app|acceptance\s+criteria|verify\.md)\b|\bprove\b[^\n]{0,60}\bacceptance\s+criteria\b)/i,
+  },
+  {
+    skill: 'test',
+    pattern:
+      /(?:(?:^|[\s`])\/test\b|\b(?:write|add|build)\b[^\n]{0,40}\btest\s+suite\b|\btest\s+(?:the\s+)?uncommitted\s+changes\b|\badd\s+(?:a\s+)?regression\s+test\b)/i,
+  },
+  {
+    skill: 'document',
+    pattern:
+      /(?:(?:^|[\s`])\/document(?:\s+(?:pr|changelog|release-note|postmortem))?\b|\b(?:draft|write|prepare)\b[^\n]{0,50}\b(?:pull\s+request|PR)\s+(?:body|description)\b|\b(?:write|update)\b[^\n]{0,40}\bchangelog\b|\b(?:release\s+note|postmortem)\b)/i,
+  },
+  {
+    skill: 'sync',
+    pattern:
+      /(?:(?:^|[\s`])\/sync\b|\b(?:sync|reconcile)\b[^\n]{0,80}\b(?:AGENTS\.md|scope|spec\s+status|workflow\s+state)\b)/i,
   },
   {
     skill: 'imprint',
@@ -164,12 +199,24 @@ export function detectLikelySkills(prompt = '') {
     }
   }
 
-  // Recover dominates when the user is in a failure loop.
-  if (matches.includes('recover')) {
-    return ['recover'];
+  // Debug can run at any point and owns broken behavior.
+  if (matches.includes('debug')) {
+    return ['debug'];
   }
 
-  const ordered = ['architect', 'imprint', 'review', 'remember'];
+  const ordered = [
+    'scope',
+    'audit',
+    'architect',
+    'develop',
+    'check verify',
+    'test',
+    'check review',
+    'document',
+    'sync',
+    'imprint',
+    'remember',
+  ];
   return ordered.filter((skill) => matches.includes(skill));
 }
 
@@ -248,7 +295,9 @@ function sessionStartContext(cwd = process.cwd()) {
     '- Gates: completion status on edited turns only',
     '- Skills: high-precision matches only; never required for ordinary fixes',
     memoryLine,
-    'Available playbooks when precisely matched: `/architect`, `/review`, `/recover`, `/imprint`, `/remember`.',
+    'JS Mastery Pro playbooks: `/scope`, `/audit`, `/architect`, `/develop`, `/check verify`, `/test`, `/check review`, `/document`, `/sync`, `/debug`.',
+    'Workflow depth in the project scope decides the checking tail; hooks do not require the full chain for every change.',
+    'Legacy playbooks retained only for precise matches: `/imprint`, `/remember`.',
     'Edited-turn final line must be one of: DONE, DONE_WITH_CONCERNS, BLOCKED, NEEDS_CONTEXT.',
     'Do not add button/UI chrome tests or non-LLM evals to satisfy process.',
   ].join('\n');
@@ -283,7 +332,7 @@ export function buildHookResponse(payload = {}) {
     if (Number.isFinite(exitCode) && exitCode !== 0) {
       return additionalContextOutput(
         'PostToolUse',
-        'Tool failed. If this is a repeated or unclear failure loop, use `/recover` before more patches. Ordinary first failures: fix the root cause directly.',
+        'Tool failed. Use `/debug` when the failure reflects broken behavior or its cause is unclear. A routine command mistake can be corrected directly.',
       );
     }
 
