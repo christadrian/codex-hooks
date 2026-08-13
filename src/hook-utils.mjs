@@ -314,7 +314,7 @@ export function createUserHookToml(repoPath) {
     `command = ${JSON.stringify(command)}`,
     '',
     '[[hooks.PostToolUse]]',
-    'matcher = "apply_patch|Edit|Write|Bash|exec_command|Shell"',
+    'matcher = "apply_patch|Edit|Write|Bash"',
     '[[hooks.PostToolUse.hooks]]',
     'type = "command"',
     `command = ${JSON.stringify(command)}`,
@@ -380,10 +380,11 @@ export function stripLegacyJmpHooks(existingToml = '') {
 
 export function mergeHooksToml(existingToml = '', repoPath) {
   const managedBlock = [MANAGED_TOML_START, createUserHookToml(repoPath).trimEnd(), MANAGED_TOML_END].join('\n');
+  const trustState = existingToml.match(/\n(\[hooks\.state\][\s\S]*?)(?=\n# END codex-javascript-mastery-hooks)/)?.[1];
   const withoutManagedBlock = existingToml.replace(MANAGED_TOML_PATTERN, '\n');
   const withoutLegacy = stripLegacyJmpHooks(withoutManagedBlock).trimEnd();
 
-  return `${withoutLegacy}${withoutLegacy ? '\n\n' : ''}${managedBlock}\n`;
+  return `${withoutLegacy}${withoutLegacy ? '\n\n' : ''}${managedBlock}${trustState ? `\n\n${trustState}` : ''}\n`;
 }
 
 export function writeFileAtomic(filePath, contents) {

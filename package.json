@@ -8,6 +8,8 @@
     "codex-jmp-hook": "bin/codex-jmp-hook.mjs"
   },
   "files": [
+    ".codex-plugin/",
+    "hooks/",
     "bin/",
     "src/",
     "scripts/",

@@ -297,6 +297,29 @@ describe('mergeHooksToml', () => {
     assert.doesNotMatch(twice, /old-repo/);
   });
 
+  it('preserves Codex hook trust state appended inside the managed block', () => {
+    const installed = mergeHooksToml('', '/old-repo');
+    const withTrustState = installed.replace(
+      '# END codex-javascript-mastery-hooks',
+      [
+        '[hooks.state]',
+        '',
+        '[hooks.state."/home/user/.codex/config.toml:stop:0:0"]',
+        'trusted_hash = "sha256:abc123"',
+        '',
+        '# END codex-javascript-mastery-hooks',
+      ].join('\n'),
+    );
+
+    const next = mergeHooksToml(withTrustState, '/new-repo');
+
+    assert.match(next, /\[hooks\.state\]/);
+    assert.match(next, /trusted_hash = "sha256:abc123"/);
+    assert.equal((next.match(/\[hooks\.state\]/g) ?? []).length, 1);
+    assert.match(next, /new-repo/);
+    assert.doesNotMatch(next, /old-repo/);
+  });
+
   it('strips legacy unscoped jmp hook tables before wrapping managed markers', () => {
     const legacy = [
       'model = "gpt-5"',
@@ -362,7 +385,7 @@ describe('createUserHookToml', () => {
     assert.match(toml, /\[\[hooks\.UserPromptSubmit\]\]/);
     assert.match(toml, /\[\[hooks\.PostToolUse\]\]/);
     assert.match(toml, /\[\[hooks\.Stop\]\]/);
-    assert.match(toml, /exec_command/);
+    assert.doesNotMatch(toml, /exec_command|Shell/);
   });
 });
 

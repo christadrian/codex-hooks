@@ -73,6 +73,6 @@ describe('install-user-hook', () => {
 
 describe('package publish config', () => {
   it('publishes runtime files and excludes local memory/test artifacts', () => {
-    assert.deepEqual(packageJson.files, ['bin/', 'src/', 'scripts/', 'README.md']);
+    assert.deepEqual(packageJson.files, ['.codex-plugin/', 'hooks/', 'bin/', 'src/', 'scripts/', 'README.md']);
   });
 });

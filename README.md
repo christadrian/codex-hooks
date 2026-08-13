@@ -28,7 +28,13 @@ Hard rules these hooks will **not** impose:
 
 `/remember restore` is never automatic.
 
-## User-level install
+## Plugin install
+
+The repository is a Codex plugin. Its lifecycle hooks live in `hooks/hooks.json` and resolve the runtime through `${PLUGIN_ROOT}`, so plugin installs do not modify `~/.codex/config.toml` or depend on the repository's absolute path.
+
+Plugin hooks still require review through `/hooks` before Codex runs them.
+
+## Legacy user-level install
 
 ```bash
 npm run install:user
@@ -42,7 +48,7 @@ Installs a managed block into `~/.codex/config.toml` between:
 # END codex-javascript-mastery-hooks
 ```
 
-Re-running install replaces that block cleanly. Legacy unscoped `codex-jmp-hook.mjs` entries are stripped first so duplicates are not created. Unrelated hooks such as `codex-wakatime` are preserved.
+Re-running install replaces that block cleanly. Codex-generated `[hooks.state]` trust entries are moved outside the managed markers and preserved. Legacy unscoped `codex-jmp-hook.mjs` entries are stripped first so duplicates are not created. Unrelated hooks such as `codex-wakatime` are preserved.
 
 ## Test and eval
 
