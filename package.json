@@ -1,6 +1,6 @@
 {
   "name": "codex-javascript-mastery-hooks",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Codex lifecycle hooks for JavaScript-Mastery-Pro skill workflows.",
   "type": "module",
   "private": false,

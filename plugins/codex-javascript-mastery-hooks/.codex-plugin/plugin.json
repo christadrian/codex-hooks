@@ -1,6 +1,6 @@
 {
   "name": "codex-javascript-mastery-hooks",
-  "version": "0.1.0+codex.20260813080740",
+  "version": "0.1.1+codex.20260822112915",
   "description": "Deterministic completion gates and high-precision workflow nudges for Codex.",
   "author": {
     "name": "christadrian",
