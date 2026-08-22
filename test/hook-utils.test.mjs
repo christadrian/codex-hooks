@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { afterEach, describe, it } from 'node:test';
 
 import {
@@ -20,7 +21,7 @@ import {
   shellLooksLikeMutation,
   shouldMarkTurnEdited,
   stripLegacyJmpHooks,
-} from '../src/hook-utils.mjs';
+} from '../plugins/codex-javascript-mastery-hooks/src/hook-utils.mjs';
 
 describe('detectLikelySkills', () => {
   it('routes explicit architecture prompts to architect', () => {
@@ -389,6 +390,42 @@ describe('stripLegacyJmpHooks', () => {
 
     assert.match(stripLegacyJmpHooks(text), /codex-wakatime/);
   });
+
+  it('removes only the legacy entry when the event has a sibling hook', () => {
+    const text = [
+      '[[hooks.Stop]]',
+      '',
+      '[[hooks.Stop.hooks]]',
+      'type = "command"',
+      'command = "node \\"/old/bin/codex-jmp-hook.mjs\\""',
+      '',
+      '[[hooks.Stop.hooks]]',
+      'type = "command"',
+      'command = "codex-wakatime --hook"',
+      '',
+    ].join('\n');
+
+    const next = stripLegacyJmpHooks(text);
+    assert.doesNotMatch(next, /codex-jmp-hook\.mjs/);
+    assert.match(next, /\[\[hooks\.Stop\.hooks\]\]/);
+    assert.match(next, /codex-wakatime --hook/);
+  });
+
+  it('drops the parent event when every legacy hook entry is removed', () => {
+    const text = [
+      '[[hooks.Stop]]',
+      '[[hooks.Stop.hooks]]',
+      'type = "command"',
+      'command = "node \\"/old/bin/codex-jmp-hook.mjs\\""',
+      '',
+    ].join('\n');
+
+    const stripped = stripLegacyJmpHooks(text);
+    assert.doesNotMatch(stripped, /\[\[hooks\.Stop\]\]/);
+
+    const merged = mergeHooksToml(text, '/repo');
+    assert.equal((merged.match(/\[\[hooks\.Stop\]\]/g) ?? []).length, 1);
+  });
 });
 
 describe('writeFileAtomic', () => {
@@ -396,7 +433,7 @@ describe('writeFileAtomic', () => {
     const { mkdtempSync, readFileSync, rmSync } = await import('node:fs');
     const { tmpdir } = await import('node:os');
     const { join } = await import('node:path');
-    const { writeFileAtomic } = await import('../src/hook-utils.mjs');
+    const { writeFileAtomic } = await import('../plugins/codex-javascript-mastery-hooks/src/hook-utils.mjs');
 
     const dir = mkdtempSync(join(tmpdir(), 'codex-hooks-atomic-'));
     const target = join(dir, 'config.toml');
@@ -405,6 +442,28 @@ describe('writeFileAtomic', () => {
       writeFileAtomic(target, 'model = "gpt-5"\n');
 
       assert.equal(readFileSync(target, 'utf8'), 'model = "gpt-5"\n');
+      assert.equal((fs.statSync(target).mode & 0o777), 0o600);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('preserves the existing target permission mode', async () => {
+    const { mkdtempSync, readFileSync, rmSync, writeFileSync, chmodSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { writeFileAtomic } = await import('../plugins/codex-javascript-mastery-hooks/src/hook-utils.mjs');
+
+    const dir = mkdtempSync(join(tmpdir(), 'codex-hooks-atomic-mode-'));
+    const target = join(dir, 'config.toml');
+
+    try {
+      writeFileSync(target, 'old\n');
+      chmodSync(target, 0o640);
+      writeFileAtomic(target, 'new\n');
+
+      assert.equal(readFileSync(target, 'utf8'), 'new\n');
+      assert.equal((fs.statSync(target).mode & 0o777), 0o640);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

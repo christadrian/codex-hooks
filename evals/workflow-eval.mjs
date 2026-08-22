@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
-import { buildHookResponse, clearTurnEdited, markTurnEdited } from '../src/hook-utils.mjs';
+import { buildHookResponse, clearTurnEdited, markTurnEdited } from '../plugins/codex-javascript-mastery-hooks/src/hook-utils.mjs';
 
 const cases = [
   {

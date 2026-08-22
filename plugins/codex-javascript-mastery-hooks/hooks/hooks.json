@@ -1,0 +1,9 @@
+{
+  "hooks": {
+    "SessionStart": [{ "hooks": [{ "type": "command", "command": "node \"${PLUGIN_ROOT}/bin/codex-jmp-hook.mjs\"", "commandWindows": "node \"%PLUGIN_ROOT%\\bin\\codex-jmp-hook.mjs\"" }] }],
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "node \"${PLUGIN_ROOT}/bin/codex-jmp-hook.mjs\"", "commandWindows": "node \"%PLUGIN_ROOT%\\bin\\codex-jmp-hook.mjs\"" }] }],
+    "PostToolUse": [{ "matcher": "apply_patch|Edit|Write|Bash", "hooks": [{ "type": "command", "command": "node \"${PLUGIN_ROOT}/bin/codex-jmp-hook.mjs\"", "commandWindows": "node \"%PLUGIN_ROOT%\\bin\\codex-jmp-hook.mjs\"" }] }],
+    "Stop": [{ "hooks": [{ "type": "command", "command": "node \"${PLUGIN_ROOT}/bin/codex-jmp-hook.mjs\"", "commandWindows": "node \"%PLUGIN_ROOT%\\bin\\codex-jmp-hook.mjs\"" }] }],
+    "SessionEnd": [{ "hooks": [{ "type": "command", "command": "node \"${PLUGIN_ROOT}/bin/codex-jmp-hook.mjs\"", "commandWindows": "node \"%PLUGIN_ROOT%\\bin\\codex-jmp-hook.mjs\"" }] }]
+  }
+}

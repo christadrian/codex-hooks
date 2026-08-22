@@ -5,20 +5,16 @@
   "type": "module",
   "private": false,
   "bin": {
-    "codex-jmp-hook": "bin/codex-jmp-hook.mjs"
+    "codex-jmp-hook": "plugins/codex-javascript-mastery-hooks/bin/codex-jmp-hook.mjs"
   },
   "files": [
-    ".codex-plugin/",
-    "hooks/",
-    "bin/",
-    "src/",
-    "scripts/",
+    "plugins/codex-javascript-mastery-hooks/",
     "README.md"
   ],
   "scripts": {
     "test": "node --test",
     "eval": "node evals/workflow-eval.mjs",
-    "install:user": "node scripts/install-user-hook.mjs",
+    "install:user": "node plugins/codex-javascript-mastery-hooks/scripts/install-user-hook.mjs",
     "check": "npm test && npm run eval"
   },
   "engines": {

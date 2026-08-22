@@ -8,7 +8,7 @@
       "name": "codex-javascript-mastery-hooks",
       "source": {
         "source": "local",
-        "path": "."
+        "path": "./plugins/codex-javascript-mastery-hooks"
       },
       "policy": {
         "installation": "AVAILABLE",

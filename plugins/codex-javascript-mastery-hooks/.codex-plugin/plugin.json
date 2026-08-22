@@ -9,6 +9,7 @@
   },
   "repository": "https://github.com/christadrian/codex-hooks",
   "license": "MIT",
+  "hooks": "./hooks/hooks.json",
   "interface": {
     "displayName": "Codex JavaScript Mastery Hooks",
     "shortDescription": "Completion gates and workflow nudges",

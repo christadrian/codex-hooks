@@ -441,27 +441,47 @@ export function stripLegacyJmpHooks(existingToml = '') {
   while (i < lines.length) {
     const line = lines[i];
 
-    // Top-level event tables look like [[hooks.Stop]] (one dotted name).
-    // Nested tables look like [[hooks.Stop.hooks]] and belong to the parent event.
-    if (/^\[\[hooks\.[A-Za-z0-9_]+\]\]\s*$/.test(line)) {
+    const event = line.match(/^\[\[hooks\.([A-Za-z0-9_]+)\]\]\s*$/);
+    if (event) {
+      // Keep one event together so a parent with no surviving hook entries is
+      // removed along with its matcher/metadata, not left as an empty table.
       let j = i + 1;
-      const block = [line];
-      while (j < lines.length) {
-        const next = lines[j];
-        if (/^\[\[hooks\.[A-Za-z0-9_]+\]\]\s*$/.test(next) || /^\[[^\[]/.test(next)) {
-          break;
-        }
-        block.push(next);
+      while (j < lines.length && !/^\[\[hooks\.[A-Za-z0-9_]+\]\]\s*$/.test(lines[j]) && !/^\[(?!\[)/.test(lines[j])) {
         j += 1;
       }
 
-      const blockText = block.join('\n');
-      if (LEGACY_HOOK_COMMAND_RE.test(blockText)) {
-        i = j;
-        continue;
+      const block = lines.slice(i, j);
+      const kept = [block[0]];
+      let removedLegacy = false;
+      let hasSurvivingHook = false;
+      let k = 1;
+
+      while (k < block.length) {
+        const nested = block[k].match(/^\[\[hooks\.[A-Za-z0-9_]+\.hooks\]\]\s*$/);
+        if (nested) {
+          let end = k + 1;
+          while (end < block.length && !/^\[/.test(block[end])) end += 1;
+          const nestedBlock = block.slice(k, end);
+          if (LEGACY_HOOK_COMMAND_RE.test(nestedBlock.join('\n'))) {
+            removedLegacy = true;
+          } else {
+            hasSurvivingHook = true;
+            kept.push(...nestedBlock);
+          }
+          k = end;
+          continue;
+        }
+
+        if (/^\s*command\s*=/.test(block[k])) {
+          if (LEGACY_HOOK_COMMAND_RE.test(block[k])) removedLegacy = true;
+          else hasSurvivingHook = true;
+        } else {
+          kept.push(block[k]);
+        }
+        k += 1;
       }
 
-      out.push(...block);
+      if (!(removedLegacy && !hasSurvivingHook)) out.push(...kept);
       i = j;
       continue;
     }
@@ -487,9 +507,17 @@ export function writeFileAtomic(filePath, contents) {
   const dir = path.dirname(filePath);
   const base = path.basename(filePath);
   const tmpPath = path.join(dir, `.${base}.${process.pid}.${randomUUID()}.tmp`);
+  let mode = 0o600;
+
+  try {
+    mode = fs.statSync(filePath).mode & 0o7777;
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
 
   try {
     fs.writeFileSync(tmpPath, contents);
+    fs.chmodSync(tmpPath, mode);
     fs.renameSync(tmpPath, filePath);
   } catch (error) {
     try {

@@ -38,7 +38,7 @@ The hooks follow the upstream workflow without owning its state or sequencing. `
 
 ## Plugin install
 
-The repository is a Codex plugin. Its lifecycle hooks live in `hooks/hooks.json` and resolve the runtime through `${PLUGIN_ROOT}`, so plugin installs do not modify `~/.codex/config.toml` or depend on the repository's absolute path.
+The repository is a Codex marketplace. The `codex-javascript-mastery-hooks` plugin lives in `plugins/codex-javascript-mastery-hooks/`; its lifecycle hooks live in `hooks/hooks.json` and resolve the runtime through `${PLUGIN_ROOT}`, so plugin installs do not modify `~/.codex/config.toml` or depend on the repository's absolute path.
 
 ```bash
 codex plugin marketplace add christadrian/codex-hooks --ref main
@@ -74,5 +74,5 @@ npm run check
 ## Hook input contract
 
 ```bash
-printf '{"hook_event_name":"UserPromptSubmit","prompt":"Greenfield system design for billing"}' | node bin/codex-jmp-hook.mjs
+printf '{"hook_event_name":"UserPromptSubmit","prompt":"Greenfield system design for billing"}' | node plugins/codex-javascript-mastery-hooks/bin/codex-jmp-hook.mjs
 ```
